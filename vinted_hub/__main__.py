@@ -5,15 +5,40 @@
   fill           fill one listing into the Vinted form (the user submits)
   fill-approved  fill all approved listings one after another
   prices         read Vinted's price recommendation (saves nothing on Vinted)
-  stats          fetch and store views and favorites of all own listings
+  stats          fetch and store views and favourites of all own listings
   explore        dump the upload form (when Vinted changes the form)
+  settings       show the settings as JSON; "settings set key=value ..." changes them
 """
 from __future__ import annotations
 
 import argparse
+import json
 
 from . import commands
-from .core import load_config
+from .core import SETTINGS_CHOICES, current_settings, load_config, save_settings
+from .i18n import tr
+
+
+def cmd_settings(config: dict, action: str | None, pairs: list[str]) -> None:
+    """Without arguments: print the effective settings as one line of JSON.
+    "set key=value ...": validate, save in data/settings.json and print the new settings."""
+    if action is None:
+        if pairs:
+            raise SystemExit(tr("Use: settings set key=value ..."))
+        print(json.dumps(current_settings(config)))
+        return
+    if not pairs:
+        raise SystemExit(tr("Use: settings set key=value ... (keys: {keys})", keys=", ".join(SETTINGS_CHOICES)))
+    changes = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep:
+            raise SystemExit(tr("Expected key=value, got: {text}", text=pair))
+        changes[key.strip()] = value.strip()
+    try:
+        print(json.dumps(save_settings(config, changes)))
+    except (ValueError, OSError) as e:  # OSError incl. TimeoutError: settings.json locked (message already translated)
+        raise SystemExit(str(e))
 
 
 def main() -> None:
@@ -29,7 +54,11 @@ def main() -> None:
     fa.add_argument("--only", help="only this folder")
     pr = sub.add_parser("prices", help="read Vinted's price recommendation (saves nothing on Vinted)")
     pr.add_argument("--only", help="only this folder")
-    sub.add_parser("stats", help="fetch and store views and favorites of own listings")
+    sub.add_parser("stats", help="fetch and store views and favourites of own listings")
+    st = sub.add_parser("settings", help="show the settings as JSON, or change them with: settings set key=value ...",
+                        description="Settings: " + "; ".join(f"{k} = {' | '.join(v)}" for k, v in SETTINGS_CHOICES.items()))
+    st.add_argument("action", nargs="?", choices=["set"], help="set: change settings")
+    st.add_argument("pairs", nargs="*", metavar="key=value", help="e.g. description_language=de")
     args = parser.parse_args()
 
     config = load_config()
@@ -48,6 +77,8 @@ def main() -> None:
         commands.cmd_prices(config, args.only)
     elif args.command == "stats":
         commands.cmd_stats(config)
+    elif args.command == "settings":
+        cmd_settings(config, args.action, args.pairs)
 
 
 if __name__ == "__main__":

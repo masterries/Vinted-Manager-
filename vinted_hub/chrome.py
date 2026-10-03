@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 from .core import profile_dir
+from .i18n import tr
 
 def chrome_path() -> str:
     candidates = [
@@ -19,7 +20,7 @@ def chrome_path() -> str:
     for c in candidates:
         if c.is_file():
             return str(c)
-    raise SystemExit("Google Chrome nicht gefunden.")
+    raise SystemExit(tr("Google Chrome not found."))
 
 
 def cdp_url(config: dict) -> str:
@@ -56,7 +57,7 @@ def connect_chrome(p, config: dict):
             if chrome_running(config):
                 break
         else:
-            raise SystemExit("Chrome reagiert nicht auf dem Debug-Port.")
+            raise SystemExit(tr("Chrome does not respond on the debug port."))
     browser = p.chromium.connect_over_cdp(cdp_url(config))
     return browser, browser.contexts[0]
 

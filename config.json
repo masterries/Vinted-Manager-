@@ -1,6 +1,8 @@
 {
   "domain": "https://www.vinted.lu",
-  "listing_language": "en+de",
+  "ui_language": "en",
+  "title_language": "en",
+  "description_language": "en",
   "input_folder": "0_input_photos",
   "data_folder": "data",
   "hub_port": 8765,

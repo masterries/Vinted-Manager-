@@ -10,16 +10,17 @@ import time
 from .chrome import chrome_running, connect_chrome, is_logged_in, start_chrome
 from .form import SEL_PRICE, fill_form, read_price_recommendation, wait_for_submit
 from .core import debug_dir, read_listings, read_stats, update_fields, update_many, write_stats
+from .i18n import tr
 
 # --- login ------------------------------------------------------------------
 
 def cmd_login(config: dict) -> None:
     if chrome_running(config):
-        print("Der Vinted-Chrome ist schon offen. Dort einfach einloggen.")
+        print(tr("The Vinted Chrome is already open. Just log in there."))
         return
     start_chrome(config, config["domain"])
-    print("Chrome ist offen (eigenes Profil, getrennt von deinem normalen Chrome).")
-    print("Bitte bei Vinted ganz normal selbst einloggen. Das Fenster darf offen bleiben.")
+    print(tr("Chrome is open (own profile, separate from your normal Chrome)."))
+    print(tr("Please log in to Vinted yourself as usual. The window may stay open."))
 
 
 # --- explore (dump the form to build selectors) ------------------------------
@@ -59,34 +60,111 @@ def cmd_explore(config: dict) -> None:
         try:
             if not is_logged_in(page, config):
                 page.screenshot(path=str(target / "not_logged_in.png"), full_page=True)
-                raise SystemExit("Nicht eingeloggt (oder Upload-Formular nicht gefunden). Erst den Vinted-Chrome öffnen und einloggen (Vinted Login.bat)")
+                raise SystemExit(tr("Not logged in (or upload form not found). First open the Vinted Chrome and log in (Vinted Login.bat)"))
             page.wait_for_timeout(2000)
             elements = page.evaluate(FORM_JS)
             (target / "form.json").write_text(json.dumps(elements, ensure_ascii=False, indent=1), encoding="utf-8")
             (target / "form.html").write_text(page.content(), encoding="utf-8")
             page.screenshot(path=str(target / "form.png"), full_page=True)
-            print(f"{len(elements)} Elemente gespeichert in {target}")
+            print(tr("{count} elements saved in {folder}", count=len(elements), folder=target))
         finally:
             page.close()
 
 
 def _report(listing: dict, done: list[str], missing: list[str], rec: dict | None) -> None:
-    print("  Ausgefüllt:", ", ".join(done) or "-")
+    print("  " + tr("Filled in: {fields}", fields=", ".join(done) or "-"))
     if missing:
-        print("  Bitte von Hand ergänzen:", ", ".join(missing))
+        print("  " + tr("Please add by hand: {fields}", fields=", ".join(missing)))
     if rec:
-        print(f"  Vinted-Preisempfehlung: {rec['bargain']} / {rec['optimal']} / "
-              f"{rec['premium']} € (günstig / optimal / premium), dein Preis: {listing.get('price')} €")
+        print("  " + tr("Vinted price recommendation: {bargain} / {optimal} / {premium} € (bargain / optimal / premium), "
+                        "your price: {price} €", bargain=rec["bargain"], optimal=rec["optimal"],
+                        premium=rec["premium"], price=listing.get("price")))
     if "[?" in listing.get("title", "") + listing.get("description", ""):
-        print("  Achtung: Im Text stehen noch [?]-Platzhalter, vor dem Absenden ersetzen!")
+        print("  " + tr("Careful: the text still contains [?] placeholders, replace them before submitting!"))
 
 
 def _fill_and_record(page, config: dict, listing: dict) -> None:
-    done, missing = fill_form(page, config, listing)
-    rec = read_price_recommendation(page) if "Kategorie" in done else None
+    done, missing, category_ok = fill_form(page, config, listing)
+    rec = read_price_recommendation(page) if category_ok else None
     if rec:
         update_fields(config, listing["folder"], {"vinted_price": rec})
     _report(listing, done, missing, rec)
+
+
+# --- after the user submitted: draft or online? ------------------------------
+
+def _known_item_ids(listings: list[dict], stats: dict) -> set:
+    """Vinted item IDs that existed before this upload (linked listings and every statistics snapshot)."""
+    ids = {i.get("vinted_id") for i in listings if i.get("vinted_id")}
+    for snap in stats.get("history") or []:
+        ids |= {a.get("id") for a in snap.get("items") or []}
+    return {x for x in ids if isinstance(x, int)}
+
+
+def _match_item(items: list[dict], listing: dict, url: str, listings: list[dict],
+                known_ids: frozenset | set = frozenset()) -> dict | None:
+    """The Vinted item the user just created. After "Upload" Vinted shows the profile page (/member/<id>), so
+    usually the title decides: a new item (not seen before, newer than every known ID - Vinted IDs grow) with
+    the listing's title. None if unsure; the caller then retries once and finally leaves it to the statistics."""
+    import re
+    m = re.search(r"/items/(\d+)", url or "")
+    if m:  # the page names the item: only that one (not there yet -> None, the caller retries)
+        return next((a for a in items if str(a.get("id")) == m.group(1)), None)
+    title = _normalize(listing.get("title"))
+    same = [a for a in items if a.get("id") not in known_ids and not a.get("is_closed")
+            and _normalize(a.get("title")) == title]
+    # other listings with the same title already on Vinted but not linked yet could own some of these
+    unlinked = sum(1 for i in listings if i["folder"] != listing["folder"] and not i.get("vinted_id")
+                   and i.get("status") in ("draft", "online", "sold") and _normalize(i.get("title")) == title)
+    if len(same) <= unlinked:
+        return None
+    best = max(same, key=lambda a: a.get("id") or 0)
+    return best if (best.get("id") or 0) > max(known_ids, default=0) else None
+
+
+def _record_submit(ctx, page, config: dict, listing: dict) -> None:
+    """Looks the new item up in the user's own item list (read only, the same request as the statistics) and
+    sets status online or draft, vinted_id and vinted_url - so the user never has to mark it by hand."""
+    import re
+    folder, url = listing["folder"], page.url
+    # at once: even if the job is stopped during the lookup, the listing never stays "approved" (no double upload)
+    update_fields(config, folder, {"status": "draft", "vinted_url": url})
+    item = None
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+        page.wait_for_timeout(2000)
+        url = page.url
+        listings, stats = read_listings(config), read_stats(config)
+        m = re.search(r"/member/(\d+)", url)  # after "Upload" Vinted shows the own profile
+        member = _known_member_id(listings, stats) or (m.group(1) if m else None)
+        if member is None:  # last resort: find the profile ID in a background tab
+            look = ctx.new_page()
+            try:
+                member = _member_id(look, config, listings, stats)
+            finally:
+                look.close()
+        if not stats.get("member_id"):  # remember it, so this lookup is never needed again
+            stats["member_id"] = member
+            write_stats(config, stats)
+        known = _known_item_ids(listings, stats)
+        for attempt in range(2):  # a brand-new item can take a moment to show up
+            item = _match_item(_load_wardrobe(page, config, member, navigate=False), listing, url, listings, known)
+            if item or attempt:
+                break
+            page.wait_for_timeout(4000)
+    except (Exception, SystemExit):
+        item = None
+    if item is None:
+        update_fields(config, folder, {"status": "draft", "vinted_url": url})
+        print("  " + tr("✓ Created on Vinted: {url}", url=url))
+        print("  " + tr("Could not check yet whether it is online - 'Fetch statistics' updates the status later."))
+        return
+    online = not item.get("is_draft")
+    item_url = item.get("url") or (config["domain"] + item["path"] if item.get("path") else url)
+    update_fields(config, folder, {"status": "online" if online else "draft",
+                                   "vinted_id": item["id"], "vinted_url": item_url})
+    print("  " + (tr("✓ Online on Vinted: {url}", url=item_url) if online
+                  else tr("✓ Saved as a draft on Vinted: {url}", url=item_url)))
 
 
 def cmd_fill(config: dict, folder: str) -> None:
@@ -95,7 +173,7 @@ def cmd_fill(config: dict, folder: str) -> None:
 
     listing = next((i for i in read_listings(config) if i["folder"] == folder), None)
     if listing is None:
-        raise SystemExit(f"Kein Inserat für Ordner {folder}")
+        raise SystemExit(tr("No listing for folder {folder}", folder=folder))
     with sync_playwright() as p:
         browser, ctx = connect_chrome(p, config)
         page = ctx.new_page()
@@ -104,12 +182,11 @@ def cmd_fill(config: dict, folder: str) -> None:
         _fill_and_record(page, config, listing)
         debug_dir(config).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(debug_dir(config) / f"filled_{folder}.png"), full_page=True)
-        print("  Jetzt im Chrome-Fenster prüfen und selbst auf 'Save draft' oder 'Upload' klicken.", flush=True)
+        print("  " + tr("Now check the Chrome window and click 'Save draft' or 'Upload' yourself."), flush=True)
         if wait_for_submit(page):
-            update_fields(config, folder, {"status": "draft", "vinted_url": page.url})
-            print("  ✓ Bei Vinted angelegt:", page.url)
+            _record_submit(ctx, page, config, listing)
         else:
-            print("  Tab geschlossen, nichts gespeichert.")
+            print("  " + tr("Tab closed, nothing saved."))
 
 
 # --- stats: views and favorites of the user's own listings (read only) ------
@@ -119,7 +196,8 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
-def _member_id(page, config: dict, listings: list[dict], stats: dict) -> str:
+def _known_member_id(listings: list[dict], stats: dict) -> str | None:
+    """The own Vinted profile ID if it is already known (statistics or a saved profile link)."""
     import re
     if stats.get("member_id"):
         return str(stats["member_id"])
@@ -127,19 +205,29 @@ def _member_id(page, config: dict, listings: list[dict], stats: dict) -> str:
         m = re.search(r"/member/(\d+)", i.get("vinted_url") or "")
         if m:
             return m.group(1)
+    return None
+
+
+def _member_id(page, config: dict, listings: list[dict], stats: dict) -> str:
+    import re
+    known = _known_member_id(listings, stats)
+    if known:
+        return known
     page.goto(config["domain"], wait_until="domcontentloaded")
     page.wait_for_timeout(3000)
     for href in page.eval_on_selector_all("a[href*='/member/']", "els => els.map(e => e.getAttribute('href'))"):
         m = re.search(r"/member/(\d+)", href or "")
         if m:
             return m.group(1)
-    raise SystemExit("Eigene Vinted-Profil-ID nicht gefunden. Bist du im Vinted-Chrome eingeloggt?")
+    raise SystemExit(tr("Own Vinted profile ID not found. Are you logged in to the Vinted Chrome?"))
 
 
-def _load_wardrobe(page, config: dict, member: str) -> list[dict]:
-    """All own items via the same request the Vinted profile page makes."""
-    page.goto(f"{config['domain']}/member/{member}", wait_until="domcontentloaded")
-    page.wait_for_timeout(3000)
+def _load_wardrobe(page, config: dict, member: str, navigate: bool = True) -> list[dict]:
+    """All own items via the same request the Vinted profile page makes. navigate=False: fetch from the
+    page as it is (any vinted page, e.g. the item page right after uploading)."""
+    if navigate:
+        page.goto(f"{config['domain']}/member/{member}", wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)
     items, page_no = [], 1
     while True:
         response = page.evaluate("""async (url) => {
@@ -147,7 +235,8 @@ def _load_wardrobe(page, config: dict, member: str) -> list[dict]:
             return {status: r.status, text: await r.text()};
         }""", f"/api/v2/wardrobe/{member}/items?page={page_no}&per_page=96&order=relevance")
         if response["status"] != 200:
-            raise SystemExit(f"Vinted hat die Abfrage abgelehnt (Status {response['status']}). Später nochmal versuchen.")
+            raise SystemExit(tr("Vinted refused the request (status {status}). Try again later.",
+                                status=response["status"]))
         data = json.loads(response["text"])
         items += data.get("items") or []
         if page_no >= ((data.get("pagination") or {}).get("total_pages") or 1):
@@ -215,11 +304,14 @@ def cmd_stats(config: dict) -> None:
         changes[listing["folder"]] = fields
     update_many(config, changes)
 
-    print(f"{len(items)} Artikel bei Vinted, {matched} davon Inseraten der Zentrale zugeordnet.")
+    print(tr("{count} items on Vinted, {matched} of them matched to listings in the hub.",
+             count=len(items), matched=matched))
     for a in sorted(items, key=lambda x: -x["views"]):
         old = previous.get(a["id"], {})
         plus = lambda new, k: f" (+{new - old[k]})" if k in old and new > old[k] else ""
-        print(f"  {a['views']:4} Aufrufe{plus(a['views'], 'views'):7}  {a['favorites']:3} Fav.{plus(a['favorites'], 'favorites'):6}  {a['title'][:55]}")
+        print("  " + tr("{views:4} views{views_plus:7}  {favorites:3} fav.{favorites_plus:6}  {title}",
+                        views=a["views"], views_plus=plus(a["views"], "views"), favorites=a["favorites"],
+                        favorites_plus=plus(a["favorites"], "favorites"), title=a["title"][:55]))
 
 
 def cmd_prices(config: dict, only: str | None) -> None:
@@ -232,7 +324,7 @@ def cmd_prices(config: dict, only: str | None) -> None:
                 if i.get("status") in ("new", "on_hold", "approved") and i.get("category")
                 and (not only or i["folder"] == only)]
     if not listings:
-        print("Keine passenden Inserate (brauchen eine Kategorie und dürfen noch nicht bei Vinted sein).")
+        print(tr("No matching listings (they need a category and must not be on Vinted yet)."))
         return
     with sync_playwright() as p:
         browser, ctx = connect_chrome(p, config)
@@ -240,9 +332,9 @@ def cmd_prices(config: dict, only: str | None) -> None:
             print(f"[{n}/{len(listings)}] {listing['title']}", flush=True)
             page = ctx.new_page()
             try:
-                done, missing = fill_form(page, config, listing, details_only=True)
+                done, missing, category_ok = fill_form(page, config, listing, details_only=True)
                 rec = None
-                if "Kategorie" in done:
+                if category_ok:
                     rec = read_price_recommendation(page)
                     suggestion = listing.get("price") or listing.get("suggested_price")
                     if not rec and suggestion:  # sometimes only visible after entering a price
@@ -250,17 +342,22 @@ def cmd_prices(config: dict, only: str | None) -> None:
                         rec = read_price_recommendation(page)
                 if rec:
                     update_fields(config, listing["folder"], {"vinted_price": rec})
-                    print(f"  Vinted: {rec['bargain']} / {rec['optimal']} / {rec['premium']} €"
-                          + (f"  (ohne: {', '.join(missing)})" if missing else ""), flush=True)
+                    line = f"  Vinted: {rec['bargain']} / {rec['optimal']} / {rec['premium']} €"
+                    if missing:
+                        line += "  " + tr("(without: {fields})", fields=", ".join(missing))
+                    print(line, flush=True)
                 else:
-                    print("  Keine Empfehlung gefunden" + (f" (fehlt: {', '.join(missing)})" if missing else ""), flush=True)
+                    line = "  " + tr("No recommendation found")
+                    if missing:
+                        line += " " + tr("(missing: {fields})", fields=", ".join(missing))
+                    print(line, flush=True)
             except Exception as e:
-                print(f"  Fehler: {e}", flush=True)
+                print("  " + tr("Error: {error}", error=e), flush=True)
             finally:
                 page.close(run_before_unload=False)  # discard the form, save nothing
             if n < len(listings):
                 time.sleep(random.uniform(3, 7))
-    print("Fertig.")
+    print(tr("Done."))
 
 
 def cmd_fill_approved(config: dict, only: str | None) -> None:
@@ -269,7 +366,7 @@ def cmd_fill_approved(config: dict, only: str | None) -> None:
     listings = [i for i in read_listings(config)
                 if i.get("status") == "approved" and (not only or i["folder"] == only)]
     if not listings:
-        print("Keine freigegebenen Inserate. Erst in der Zentrale freigeben.")
+        print(tr("No approved listings. Approve them in the hub first."))
         return
     with sync_playwright() as p:
         browser, ctx = connect_chrome(p, config)
@@ -278,11 +375,10 @@ def cmd_fill_approved(config: dict, only: str | None) -> None:
         for n, listing in enumerate(listings, start=1):
             print(f"\n[{n}/{len(listings)}] {listing['title']}")
             _fill_and_record(page, config, listing)
-            print("  Prüfen und selbst auf 'Save draft' oder 'Upload' klicken. Das Skript wartet so lange.", flush=True)
+            print("  " + tr("Check and click 'Save draft' or 'Upload' yourself. The script waits until then."), flush=True)
             if not wait_for_submit(page):
-                print("Tab geschlossen, Upload beendet.")
+                print(tr("Tab closed, upload stopped."))
                 return
-            update_fields(config, listing["folder"], {"status": "draft", "vinted_url": page.url})
-            print("  ✓ Bei Vinted angelegt. Falls direkt veröffentlicht: in der Zentrale 'Ist online' klicken.")
+            _record_submit(ctx, page, config, listing)
         page.close()
-    print("\nAlle freigegebenen Inserate sind bei Vinted angelegt.")
+    print("\n" + tr("All approved listings are created on Vinted."))

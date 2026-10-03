@@ -1,4 +1,4 @@
-"""Local web hub: review listings, answer questions, prices, approval, jobs, stats.
+"""Local web hub: review listings, answer questions, prices, approval, jobs, stats, settings.
 
 Start: python -m vinted_hub serve  (or double-click "Start Hub.bat")
 Runs only on this machine (127.0.0.1), Python standard library + Pillow only.
@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import chrome, core
+from .i18n import tr
 
 WEB = Path(__file__).resolve().parent / "web"
 PREVIEW_WIDTHS = (360, 1600)
@@ -50,7 +51,7 @@ def safe_image_path(config: dict, folder: str, file: str) -> Path:
     root = core.items_dir(config).resolve()
     path = (root / folder / file).resolve()
     if path.parent.parent != root or not path.is_file() or path.suffix.lower() not in core.IMAGE_EXTENSIONS:
-        raise ApiError(HTTPStatus.NOT_FOUND, "Bild nicht gefunden")
+        raise ApiError(HTTPStatus.NOT_FOUND, tr("Image not found"))
     return path
 
 
@@ -106,18 +107,48 @@ def all_data(config: dict) -> dict:
         "conditions": core.CONDITIONS,
         "packages": core.PACKAGES,
         "domain": config["domain"],
+        "settings": core.current_settings(config),
     }
 
 
-# German field names for messages shown in the hub
-FIELD_LABELS = {"title": "Titel", "description": "Beschreibung", "category": "Kategorie", "brand": "Marke",
-                "size": "Größe", "condition": "Zustand", "color": "Farbe", "material": "Material",
-                "heel_height": "Absatzhöhe", "shape": "Schuhform", "package": "Paketgröße", "notes": "Notiz",
-                "price": "Preis", "min_price": "Mindestpreis", "photos": "Fotos", "status": "Status"}
+def settings_data(config: dict) -> dict:
+    """GET/POST /api/settings: the settings, their allowed values and some read-only info."""
+    return {
+        "settings": core.current_settings(config),
+        "choices": core.SETTINGS_CHOICES,
+        "info": {
+            "domain": config["domain"],
+            "data_folder": str(core.data_dir(config)),
+            "input_folder": str(core.input_dir(config)),
+            "hub_port": int(config.get("hub_port", 8765)),
+            "chrome_port": int(config.get("chrome_port", 9222)),
+        },
+    }
+
+
+def save_settings(config: dict, changes) -> dict:
+    if not isinstance(changes, dict):
+        raise ApiError(HTTPStatus.BAD_REQUEST, tr("changes missing"))
+    try:
+        core.save_settings(config, changes)
+    except ValueError as e:
+        raise ApiError(HTTPStatus.BAD_REQUEST, str(e))
+    except OSError:
+        raise ApiError(HTTPStatus.CONFLICT, tr("settings.json is locked (open in another program?)"))
+    return settings_data(config)
+
+
+def field_labels() -> dict:
+    """Field names for messages shown in the hub (in the UI language)."""
+    return {"title": tr("Title"), "description": tr("Description"), "category": tr("Category"),
+            "brand": tr("Brand"), "size": tr("Size"), "condition": tr("Condition"), "color": tr("Colour"),
+            "material": tr("Material"), "heel_height": tr("Heel height"), "shape": tr("Shape"),
+            "package": tr("Package size"), "notes": tr("Note"), "price": tr("Price"),
+            "min_price": tr("Minimum price"), "photos": tr("Photos"), "status": tr("Status")}
 
 
 def label(field: str) -> str:
-    return FIELD_LABELS.get(field, field)
+    return field_labels().get(field, field)
 
 
 def to_number(field: str, value):
@@ -129,9 +160,9 @@ def to_number(field: str, value):
     try:
         number = round(float(text.replace(",", ".")), 2)
     except ValueError:
-        raise ApiError(HTTPStatus.BAD_REQUEST, f"{label(field)}: keine Zahl")
+        raise ApiError(HTTPStatus.BAD_REQUEST, tr("{field}: not a number", field=label(field)))
     if number != number or number in (float("inf"), float("-inf")) or number < 0:
-        raise ApiError(HTTPStatus.BAD_REQUEST, f"{label(field)}: keine gültige Zahl")
+        raise ApiError(HTTPStatus.BAD_REQUEST, tr("{field}: not a valid number", field=label(field)))
     return number
 
 
@@ -144,15 +175,15 @@ def sanitize(config: dict, folder: str, changes: dict) -> dict:
             clean[field] = to_number(field, value)
         elif field == "status":
             if value not in core.STATUSES:
-                raise ApiError(HTTPStatus.BAD_REQUEST, f"Unbekannter Status: {value}")
+                raise ApiError(HTTPStatus.BAD_REQUEST, tr("Unknown status: {status}", status=value))
             clean[field] = value
         elif field == "photos":
             if not isinstance(value, list) or not all(isinstance(f, str) for f in value):
-                raise ApiError(HTTPStatus.BAD_REQUEST, "Ungültige Fotoliste")
+                raise ApiError(HTTPStatus.BAD_REQUEST, tr("Invalid photo list"))
             actual = {f.lower(): f for f in core.photos_in_folder(config, folder)}
             clean[field] = list(dict.fromkeys(actual[f.lower()] for f in value if f.lower() in actual))
         else:
-            raise ApiError(HTTPStatus.BAD_REQUEST, f"Unbekanntes Feld: {field}")
+            raise ApiError(HTTPStatus.BAD_REQUEST, tr("Unknown field: {field}", field=field))
     return clean
 
 
@@ -162,7 +193,7 @@ def update_listing(config: dict, folder: str, changes: dict, base: dict) -> dict
     silently overwriting."""
     if not (core.items_dir(config) / folder).is_dir() and not any(
             i["folder"] == folder for i in read(config)):
-        raise ApiError(HTTPStatus.NOT_FOUND, "Ordner nicht gefunden")
+        raise ApiError(HTTPStatus.NOT_FOUND, tr("Folder not found"))
     clean = sanitize(config, folder, changes)
     with _write_lock, core.file_lock(config):
         listings = read(config)
@@ -174,14 +205,15 @@ def update_listing(config: dict, folder: str, changes: dict, base: dict) -> dict
         conflicts = [f for f, new in clean.items()
                      if f in base and stored.get(f) != base[f] and stored.get(f) != new]
         if conflicts:
-            raise ApiError(HTTPStatus.CONFLICT, "Inzwischen woanders geändert: " + ", ".join(conflicts),
+            raise ApiError(HTTPStatus.CONFLICT, tr("Changed elsewhere in the meantime: {fields}",
+                                                   fields=", ".join(label(c) for c in conflicts)),
                            {"conflicts": conflicts, "listing": enrich(config, dict(listing))})
         listing.update(clean)
         listing["updated_at"] = datetime.now().isoformat(timespec="seconds")
         try:
             core.write_listings(config, listings)
         except PermissionError:
-            raise ApiError(HTTPStatus.CONFLICT, "listings.json ist gesperrt (in einem anderen Programm offen?)")
+            raise ApiError(HTTPStatus.CONFLICT, tr("listings.json is locked (open in another program?)"))
         ver = version(config)
     result = enrich(config, dict(listing))
     result["_version"] = ver
@@ -198,7 +230,7 @@ ALLOWED_FIELDS = set(core.TEXT_FIELDS) | set(core.NUMBER_FIELDS)
 def _find_listing(listings: list[dict], folder: str) -> dict:
     listing = next((i for i in listings if i["folder"] == folder), None)
     if listing is None:
-        raise ApiError(HTTPStatus.NOT_FOUND, "Inserat nicht gefunden")
+        raise ApiError(HTTPStatus.NOT_FOUND, tr("Listing not found"))
     return listing
 
 
@@ -209,15 +241,15 @@ def answer_question(config: dict, folder: str, question_id: str, option: int, va
         listing = _find_listing(listings, folder)
         question = next((q for q in listing.get("questions") or [] if q.get("id") == question_id), None)
         if question is None:
-            raise ApiError(HTTPStatus.NOT_FOUND, "Frage nicht gefunden")
+            raise ApiError(HTTPStatus.NOT_FOUND, tr("Question not found"))
         if question.get("answer"):
-            raise ApiError(HTTPStatus.CONFLICT, "Diese Frage ist schon beantwortet")
+            raise ApiError(HTTPStatus.CONFLICT, tr("This question is already answered"))
         try:
             opt = question["options"][int(option)]
         except (IndexError, ValueError, TypeError):
-            raise ApiError(HTTPStatus.BAD_REQUEST, "Unbekannte Antwort")
+            raise ApiError(HTTPStatus.BAD_REQUEST, tr("Unknown answer"))
         if opt.get("input") and not value:
-            raise ApiError(HTTPStatus.BAD_REQUEST, "Bitte erst einen Wert eintragen")
+            raise ApiError(HTTPStatus.BAD_REQUEST, tr("Please enter a value first"))
         fields = {k: v for k, v in (opt.get("fields") or {}).items() if k in ALLOWED_FIELDS}
         affected = list(TEXT_TARGETS) + [k for k in fields if k not in TEXT_TARGETS]
         before = {k: listing.get(k) for k in affected}
@@ -237,7 +269,7 @@ def answer_question(config: dict, folder: str, question_id: str, option: int, va
             listing[k] = sanitize(config, folder, {k: v})[k]
         question["answer"] = opt.get("label", "") + (f": {value}" if value else "")
         if not_found:
-            question["note"] = "Textstelle nicht gefunden, bitte die Beschreibung kurz prüfen."
+            question["note"] = tr("Text not found, please check the description.")
         listing.setdefault("history", []).append(
             {"question": question_id, "before": before, "after": {k: listing.get(k) for k in affected}})
         listing["updated_at"] = datetime.now().isoformat(timespec="seconds")
@@ -255,11 +287,12 @@ def undo_answer(config: dict, folder: str) -> dict:
         listing = _find_listing(listings, folder)
         history = listing.get("history") or []
         if not history:
-            raise ApiError(HTTPStatus.CONFLICT, "Nichts zum Rückgängigmachen")
+            raise ApiError(HTTPStatus.CONFLICT, tr("Nothing to undo"))
         last = history[-1]
         changed = [k for k, v in last["after"].items() if listing.get(k) != v]
         if changed:
-            raise ApiError(HTTPStatus.CONFLICT, "Seitdem von Hand geändert (" + ", ".join(label(c) for c in changed) + "), Rückgängig nicht möglich")
+            raise ApiError(HTTPStatus.CONFLICT, tr("Changed by hand since then ({fields}), cannot undo",
+                                                   fields=", ".join(label(c) for c in changed)))
         listing.update(last["before"])
         history.pop()
         for q in listing.get("questions") or []:
@@ -276,11 +309,11 @@ def undo_answer(config: dict, folder: str) -> dict:
 
 def prepare_photos(config: dict, folder: str) -> int:
     if not _photos_lock.acquire(blocking=False):
-        raise ApiError(HTTPStatus.CONFLICT, "Fotos werden gerade schon vorbereitet")
+        raise ApiError(HTTPStatus.CONFLICT, tr("Photos are already being prepared"))
     try:
         listing = next((i for i in read(config) if i["folder"] == folder), None)
         if listing is None or not listing.get("photos"):
-            raise ApiError(HTTPStatus.BAD_REQUEST, "Keine Fotos ausgewählt")
+            raise ApiError(HTTPStatus.BAD_REQUEST, tr("No photos selected"))
         try:
             paths = core.prepare_upload_photos(config, listing)
         except FileNotFoundError as e:
@@ -297,7 +330,7 @@ def prepare_photos(config: dict, folder: str) -> int:
 class Job:
     def __init__(self):
         self.proc = None
-        self.title = ""
+        self.name = None
         self.folder = None
         self.log: list[str] = []
         self.exit_code = None
@@ -306,18 +339,30 @@ class Job:
     def running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
+    @property
+    def title(self) -> str:
+        return job_title(self.name) if self.name else ""
+
     def status(self) -> dict:
         return {"running": self.running(), "title": self.title, "folder": self.folder,
                 "log": self.log[-40:], "exit_code": self.exit_code}
 
 
 JOB = Job()
-JOBS = {  # name -> (command, title, needs folder)
-    "fill": (["fill"], "Inserat in Vinted ausfüllen", True),
-    "fill_approved": (["fill-approved"], "Freigegebene Inserate nacheinander ausfüllen", False),
-    "prices": (["prices"], "Vinted-Preisempfehlungen abfragen", False),
-    "stats": (["stats"], "Aufrufe & Favoriten abrufen", False),
+JOBS = {  # name -> (command, needs folder)
+    "fill": (["fill"], True),
+    "fill_approved": (["fill-approved"], False),
+    "prices": (["prices"], False),
+    "stats": (["stats"], False),
 }
+
+
+def job_title(name: str) -> str:
+    """Job title in the current UI language (asked anew on every status poll)."""
+    return {"fill": tr("Fill listing into Vinted"),
+            "fill_approved": tr("Fill approved listings one after another"),
+            "prices": tr("Get Vinted price recommendations"),
+            "stats": tr("Fetch views & favourites")}.get(name, name)
 
 
 def _read_output(proc) -> None:
@@ -329,17 +374,17 @@ def _read_output(proc) -> None:
 
 def start_job(config: dict, name: str, folder: str | None) -> dict:
     if name not in JOBS:
-        raise ApiError(HTTPStatus.BAD_REQUEST, "Unbekannter Auftrag")
-    command, title, needs_folder = JOBS[name]
+        raise ApiError(HTTPStatus.BAD_REQUEST, tr("Unknown job"))
+    command, needs_folder = JOBS[name]
     with JOB.lock:
         if JOB.running():
-            raise ApiError(HTTPStatus.CONFLICT, f"Es läuft schon: {JOB.title}")
+            raise ApiError(HTTPStatus.CONFLICT, tr("Already running: {title}", title=JOB.title))
         if not chrome.chrome_running(config):
-            raise ApiError(HTTPStatus.CONFLICT, "Der Vinted-Chrome ist nicht offen. Erst oben „Vinted-Chrome öffnen“ und einloggen.")
+            raise ApiError(HTTPStatus.CONFLICT, tr("The Vinted Chrome is not open. Open it at the top first and log in."))
         args = list(command)
         if needs_folder:
             if not folder or not any(i["folder"] == folder for i in read(config)):
-                raise ApiError(HTTPStatus.BAD_REQUEST, "Inserat nicht gefunden")
+                raise ApiError(HTTPStatus.BAD_REQUEST, tr("Listing not found"))
             args.append(folder)
         elif folder:
             args += ["--only", folder]
@@ -349,7 +394,7 @@ def start_job(config: dict, name: str, folder: str | None) -> dict:
             cwd=str(core.ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding="utf-8", errors="replace",
             env=dict(os.environ, PYTHONIOENCODING="utf-8"), **kwargs)
-        JOB.title, JOB.folder, JOB.log, JOB.exit_code = title, folder, [], None
+        JOB.name, JOB.folder, JOB.log, JOB.exit_code = name, folder, [], None
         threading.Thread(target=_read_output, args=(JOB.proc,), daemon=True).start()
     return JOB.status()
 
@@ -358,7 +403,7 @@ def stop_job() -> dict:
     with JOB.lock:
         if JOB.running():
             JOB.proc.terminate()
-            JOB.log.append("Abgebrochen. Der Vinted-Tab bleibt offen, gespeichert wurde nichts.")
+            JOB.log.append(tr("Stopped. The Vinted tab stays open, nothing was saved."))
     return JOB.status()
 
 
@@ -404,7 +449,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if not self._host_ok():
-            return self._json(HTTPStatus.FORBIDDEN, {"error": "Falscher Host"})
+            return self._json(HTTPStatus.FORBIDDEN, {"error": tr("Wrong host")})
         url = urlparse(self.path)
         try:
             if url.path in ("/", "/index.html"):
@@ -412,6 +457,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._respond(HTTPStatus.OK, html, "text/html; charset=utf-8")
             if url.path == "/api/data":
                 return self._json(HTTPStatus.OK, all_data(self.config))
+            if url.path == "/api/settings":
+                return self._json(HTTPStatus.OK, settings_data(self.config))
             if url.path == "/api/version":
                 return self._json(HTTPStatus.OK, {"version": version(self.config)})
             if url.path == "/api/stats":
@@ -419,11 +466,12 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/api/status":
                 return self._json(HTTPStatus.OK, {"version": version(self.config),
                                                   "chrome": chrome.chrome_running(self.config),
-                                                  "job": JOB.status()})
+                                                  "job": JOB.status(),
+                                                  "settings": core.current_settings(self.config)})
             if url.path.startswith("/image/"):
                 parts = url.path[len("/image/"):].split("/")
                 if len(parts) != 2:
-                    raise ApiError(HTTPStatus.NOT_FOUND, "Bild nicht gefunden")
+                    raise ApiError(HTTPStatus.NOT_FOUND, tr("Image not found"))
                 folder, file = (unquote(p) for p in parts)
                 try:
                     width = int(parse_qs(url.query).get("w", ["360"])[0])
@@ -436,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
                 if self.headers.get("If-None-Match") == etag:
                     return self._respond(HTTPStatus.NOT_MODIFIED, b"", "image/jpeg", headers)
                 return self._respond(HTTPStatus.OK, path.read_bytes(), "image/jpeg", headers)
-            raise ApiError(HTTPStatus.NOT_FOUND, "Nicht gefunden")
+            raise ApiError(HTTPStatus.NOT_FOUND, tr("Not found"))
         except Exception as e:
             self._error(e)
 
@@ -444,23 +492,23 @@ class Handler(BaseHTTPRequestHandler):
         # Only accept JSON from our own page (foreign sites cannot send it without CORS)
         origin = self.headers.get("Origin")
         if not self._host_ok() or (origin and origin.split("//", 1)[-1] not in self.allowed_hosts):
-            return self._json(HTTPStatus.FORBIDDEN, {"error": "Fremde Herkunft"})
+            return self._json(HTTPStatus.FORBIDDEN, {"error": tr("Foreign origin")})
         if not self.headers.get("Content-Type", "").startswith("application/json"):
-            return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "JSON erwartet"})
+            return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": tr("JSON expected")})
         try:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 data = json.loads(self.rfile.read(length) or b"{}")
             except (ValueError, UnicodeDecodeError):
-                raise ApiError(HTTPStatus.BAD_REQUEST, "Ungültiges JSON in der Anfrage")
+                raise ApiError(HTTPStatus.BAD_REQUEST, tr("Invalid JSON in the request"))
             if not isinstance(data, dict):
-                raise ApiError(HTTPStatus.BAD_REQUEST, "Ungültige Anfrage")
+                raise ApiError(HTTPStatus.BAD_REQUEST, tr("Invalid request"))
             folder = str(data.get("folder", ""))
             if self.path == "/api/listing":
                 changes = data.get("changes")
                 base = data.get("base") or {}
                 if not isinstance(changes, dict) or not isinstance(base, dict):
-                    raise ApiError(HTTPStatus.BAD_REQUEST, "changes fehlt")
+                    raise ApiError(HTTPStatus.BAD_REQUEST, tr("changes missing"))
                 return self._json(HTTPStatus.OK, update_listing(self.config, folder, changes, base))
             if self.path == "/api/photos/prepare":
                 return self._json(HTTPStatus.OK, {"count": prepare_photos(self.config, folder)})
@@ -475,7 +523,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(HTTPStatus.OK, stop_job())
             if self.path == "/api/chrome/open":
                 return self._json(HTTPStatus.OK, open_chrome(self.config))
-            raise ApiError(HTTPStatus.NOT_FOUND, "Nicht gefunden")
+            if self.path == "/api/settings":
+                return self._json(HTTPStatus.OK, save_settings(self.config, data.get("changes")))
+            raise ApiError(HTTPStatus.NOT_FOUND, tr("Not found"))
         except Exception as e:
             self._error(e)
 
@@ -495,16 +545,16 @@ def run(config: dict, open_browser: bool = True) -> None:
         try:
             with urllib.request.urlopen(url + "api/version", timeout=2):
                 pass
-            print(f"Die Zentrale läuft schon: {url}")
+            print(tr("The hub is already running: {url}", url=url))
             if open_browser:
                 webbrowser.open(url)
             return
         except OSError:
-            raise SystemExit(f"Port {port} ist von einem anderen Programm belegt. "
-                             f"In config.json 'hub_port' ändern.")
+            raise SystemExit(tr("Port {port} is used by another program. Change 'hub_port' in config.json.",
+                                port=port))
     Handler.config = config
     Handler.allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-    print(f"Vinted Zentrale läuft: {url}  (Beenden: Fenster schließen oder Strg+C)", flush=True)
+    print(tr("Vinted Hub is running: {url}  (to stop: close this window or press Ctrl+C)", url=url), flush=True)
     if open_browser:
         webbrowser.open(url)
     try:

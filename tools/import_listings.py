@@ -2,6 +2,7 @@
 
 Usage:   python tools/import_listings.py [folder ...]     (none given: all data/analysis/*.json)
 - Every file must pass the checker, otherwise it is skipped.
+- Missing "title_language" / "description_language" are filled in from the current settings.
 - New folders are appended. Existing listings are NOT overwritten,
   except with --replace and only while they are still "new" and no question has been answered.
 """
@@ -22,6 +23,7 @@ def main() -> None:
     config = core.load_config()
     out_dir = core.analysis_dir(config)
     files = [out_dir / f"{o}.json" for o in args] if args else sorted(out_dir.glob("[!_]*.json"))
+    settings = core.current_settings(config)
     added, replaced, skipped, checked = [], [], [], []
     for path in files:
         listing = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -31,6 +33,9 @@ def main() -> None:
             continue
         listing.setdefault("status", "new")
         listing.setdefault("history", [])
+        for key in ("title_language", "description_language"):
+            if listing.get(key) is None:
+                listing[key] = settings[key]
         checked.append(listing)
     # Read and write under the lock: the hub may run in parallel
     with core.file_lock(config):
