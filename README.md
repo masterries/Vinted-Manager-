@@ -10,7 +10,7 @@ Drop in photos → Claude analyses them (brand, size, condition, heel height, pr
 you review and answer open questions with one click → the Vinted form is filled in automatically →
 **you press “Upload” yourself** → views and favourites are tracked.
 
-![Zentrale – Inserate mit Fragen-Knöpfen](docs/bilder/zentrale-inserate.png)
+![Zentrale – Inserate mit Fragen-Knöpfen](docs/images/hub-listings.png)
 
 ---
 
@@ -28,14 +28,14 @@ you review and answer open questions with one click → the Vinted form is fille
 
 | Preise | Vinted-Formular, automatisch ausgefüllt |
 |---|---|
-| ![Preise](docs/bilder/zentrale-preise.png) | ![Ausgefülltes Vinted-Formular](docs/bilder/vinted-formular.png) |
+| ![Preise](docs/images/hub-prices.png) | ![Ausgefülltes Vinted-Formular](docs/images/vinted-form.png) |
 
-![Statistik](docs/bilder/zentrale-statistik.png)
+![Statistik](docs/images/hub-stats.png)
 
 <details>
 <summary>Statistik im dunklen Modus</summary>
 
-![Statistik dunkel](docs/bilder/zentrale-statistik-dunkel.png)
+![Statistik dunkel](docs/images/hub-stats-dark.png)
 </details>
 
 ### Installation (Windows)
@@ -52,31 +52,41 @@ Ein eigener Playwright-Browser wird **nicht** gebraucht – die Skripte verbinde
 ### Benutzung
 
 1. **`Vinted Login.bat`** – öffnet einen normalen Chrome mit eigenem Profil. Einmal selbst bei Vinted einloggen, Fenster offen lassen.
-2. Fotos unsortiert in **`0_input_foto/`** legen und Claude (Claude Code im Projektordner) sagen:
-   „Neue Fotos sind in 0_input_foto, bitte analysieren.“ – die Arbeitsanweisung steht in [`CLAUDE.md`](CLAUDE.md).
-3. **`Freigabe starten.bat`** – öffnet die Zentrale unter http://127.0.0.1:8765.
+2. Fotos unsortiert in **`0_input_photos/`** legen und Claude (Claude Code im Projektordner) sagen:
+   „Neue Fotos sind in 0_input_photos, bitte analysieren.“ – die Arbeitsanweisung steht in [`CLAUDE.md`](CLAUDE.md).
+3. **`Start Hub.bat`** – öffnet die Zentrale unter http://127.0.0.1:8765.
 4. Fragen beantworten, Preise festlegen, **Freigeben**, dann **„In Vinted ausfüllen“** und im Vinted-Chrome selbst abschicken.
 5. Ab und zu **„Statistik abrufen“**.
 
-Kurzanleitung für den Alltag: [`ANLEITUNG.md`](ANLEITUNG.md).
+Alle Schritte gehen auch per Kommandozeile: `.venv\Scripts\python.exe -m vinted_hub <befehl>`
+(`serve`, `login`, `fill <ordner>`, `fill-approved`, `prices`, `stats`, `explore`).
+
+Kurzanleitung für den Alltag: [`docs/GUIDE.md`](docs/GUIDE.md).
 
 ### Projektstruktur
 
 ```
-vinted.py                  CLI: login, freigabe, ausfuellen, hochladen, preise, statistik, erkunden
-freigabe.py                lokaler Server der Zentrale (nur Standardbibliothek + Pillow)
-web/freigabe.html          Oberfläche (eine Datei, Vanilla-JS, Diagramme als SVG)
-werkzeuge/                 kontaktbogen.py · pruefe_inserat.py · uebernehmen.py · dropdowns_erkunden.py
-.claude/workflows/         vinted-analyse.js – Analyse-Workflow für Claude Code
-config.json                Domain, Ports, Sprache der Inseratstexte (en+de)
+vinted_hub/                Python-Paket – python -m vinted_hub serve|login|fill|fill-approved|prices|stats|explore
+  core.py                  Konfiguration, Pfade, Lesen/Schreiben der Daten (mit Dateisperre), Fotos
+  chrome.py · form.py      Vinted-Chrome per CDP, Formular ausfüllen
+  commands.py              Befehle (fill, fill-approved, prices, stats, login, explore)
+  server.py                lokaler Server der Zentrale (nur Standardbibliothek + Pillow)
+  web/hub.html             Oberfläche (eine Datei, Vanilla-JS, Diagramme als SVG)
+tools/                     contact_sheet.py · check_listing.py · import_listings.py · explore_dropdowns.py
+.claude/workflows/         vinted-analysis.js – Analyse-Workflow für Claude Code
+config.json                Domain, Ports, Sprache der Inseratstexte (en+de), Ordner
+Start Hub.bat              Zentrale starten · Vinted Login.bat – Vinted-Chrome öffnen
+data/                      alle persönlichen Daten (nicht im Git)
+docs/                      GUIDE.md (Kurzanleitung) · images/ (Screenshots)
 CLAUDE.md / AGENTS.md      Arbeitsanweisung für KI-Agenten
 ```
 
 ### Daten & Datenschutz
 
-Persönliche Daten bleiben **lokal** und sind per `.gitignore` ausgeschlossen: Fotos (`0_input_foto/`, `schuhe/`),
-Inserate (`inserate.json`), Statistik (`statistik.json`), Analyse-Ergebnisse, Archiv, Debug-Ausgaben und das
-Browser-Profil mit dem Vinted-Login. Fotos werden vor dem Hochladen gedreht, verkleinert und **ohne GPS-Metadaten** gespeichert.
+Persönliche Daten bleiben **lokal** und sind per `.gitignore` ausgeschlossen: Fotos (`0_input_photos/`, `data/items/`),
+Inserate (`data/listings.json`), Statistik (`data/stats.json`), Analyse-Ergebnisse (`data/analysis/`), Archiv (`data/archive/`),
+Debug-Ausgaben (`data/debug/`) und das Browser-Profil mit dem Vinted-Login (`data/browser-profile/`).
+Fotos werden vor dem Hochladen gedreht, verkleinert und **ohne GPS-Metadaten** gespeichert.
 
 ### Hinweis zu Vinted
 
@@ -108,14 +118,17 @@ Requires Python 3.9+ and Google Chrome (no separate Playwright browser download)
 ### Usage
 
 1. `Vinted Login.bat` – log in to Vinted yourself in the dedicated Chrome window and keep it open.
-2. Put photos into `0_input_foto/` and ask Claude Code (in this folder) to analyse them – see [`CLAUDE.md`](CLAUDE.md).
-3. `Freigabe starten.bat` – opens the hub at http://127.0.0.1:8765.
+2. Put photos into `0_input_photos/` and ask Claude Code (in this folder) to analyse them – see [`CLAUDE.md`](CLAUDE.md).
+3. `Start Hub.bat` – opens the hub at http://127.0.0.1:8765.
 4. Answer questions, set prices, approve, click **“In Vinted ausfüllen”**, then submit in the Vinted Chrome yourself.
+
+Command line: `.venv\Scripts\python.exe -m vinted_hub serve|login|fill <folder>|fill-approved|prices|stats|explore`.
+The hub’s user interface is German; code, file names and data keys are English.
 
 ### Privacy
 
-All personal data (photos, listings, statistics, browser profile) stays local and is excluded via `.gitignore`.
-Upload photos are rotated, resized and stripped of GPS metadata.
+All personal data (photos, listings, statistics, browser profile) stays local in `data/` (plus `0_input_photos/`) and is
+excluded via `.gitignore`. Upload photos are rotated, resized and stripped of GPS metadata.
 
 ### Disclaimer
 

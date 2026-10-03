@@ -1,23 +1,13 @@
-# Persönliche Daten – gehören nicht ins Repo
-0_input_foto/
-schuhe/
-analyse/
-_archiv/
-erkunden/
-browser-profil/
-inserate.json
-inserate.json.bak
-inserate.*.tmp
-inserate.lock
-statistik.json
-statistik.*.tmp
+# Personal data – never commit
+data/
+0_input_photos/
 
-# Python / Umgebung
+# Python / environment
 .venv/
 __pycache__/
 *.pyc
 
-# Sonstiges
+# Misc
 *.tmp
 Thumbs.db
 desktop.ini

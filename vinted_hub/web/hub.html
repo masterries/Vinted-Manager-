@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinted Zentrale</title>
+<style>
+:root {
+  --bg: #f4f5f6; --panel: #ffffff; --text: #1c2226; --muted: #67727b; --line: #e1e4e7;
+  --accent: #0b7a75; --accent-ink: #ffffff; --accent-soft: #e3f2f1;
+  --red: #b42318; --red-soft: #fdecea; --yellow: #8a5a00; --yellow-soft: #fff5dc; --green: #157a3a; --green-soft: #e5f5ea;
+  --s-new: #5b6670; --s-on_hold: #a15c07; --s-approved: #157a3a; --s-draft: #1d5fd1; --s-online: #6d3fd1; --s-sold: #1c2226;
+  --radius: 10px; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101315; --panel: #191d20; --text: #e6e9eb; --muted: #98a2ab; --line: #2a3035;
+    --accent: #2bb3ab; --accent-ink: #06201f; --accent-soft: #11302e;
+    --red: #ff8a80; --red-soft: #3a1714; --yellow: #f3c66b; --yellow-soft: #33280f; --green: #6fd08f; --green-soft: #10301b;
+    --s-new: #98a2ab; --s-on_hold: #f0a640; --s-approved: #6fd08f; --s-draft: #7aa7ff; --s-online: #b49aff; --s-sold: #e6e9eb;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+.filter { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip .n { opacity: .7; margin-left: 4px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 14px; cursor: pointer; white-space: nowrap; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { padding: 2px 8px; font-size: 12px; border-radius: 6px; }
+.layout { display: grid; grid-template-columns: 330px 1fr; min-height: calc(100% - var(--header-h, 58px)); }
+.list { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; max-height: calc(100vh - var(--header-h, 58px)); position: sticky; top: var(--header-h, 58px); }
+.item { display: grid; grid-template-columns: 56px 1fr; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+.item:hover { background: var(--bg); }
+.item[aria-current="true"] { background: var(--accent-soft); }
+.item img, .item .no-image { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: var(--line); display: block; }
+.item .t { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .row { display: flex; gap: 6px; align-items: center; margin-top: 3px; flex-wrap: wrap; }
+.pill { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.s-new { color: var(--s-new); } .s-on_hold { color: var(--s-on_hold); } .s-approved { color: var(--s-approved); }
+.s-draft { color: var(--s-draft); } .s-online { color: var(--s-online); } .s-sold { color: var(--s-sold); }
+.badge-missing { font-size: 11.5px; color: var(--red); background: var(--red-soft); padding: 1px 7px; border-radius: 999px; }
+.badge-ok { font-size: 11.5px; color: var(--green); background: var(--green-soft); padding: 1px 7px; border-radius: 999px; }
+.empty-list { padding: 24px 16px; color: var(--muted); }
+.detail { padding: 18px 22px 110px; max-width: 980px; width: 100%; }
+.detail-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.detail-header .title-block { flex: 1; min-width: 0; }
+.detail-header .folder { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, Consolas, monospace; }
+.detail-header h2 { margin: 2px 0 0; font-size: 21px; line-height: 1.25; overflow-wrap: anywhere; }
+.save-state { font-size: 12.5px; color: var(--muted); min-width: 90px; text-align: right; padding-top: 4px; }
+.save-state.error { color: var(--red); }
+.back { display: none; }
+.box { border-radius: var(--radius); padding: 11px 14px; margin-bottom: 12px; }
+.box h3 { margin: 0 0 4px; font-size: 14px; }
+.box ul { margin: 0; padding-left: 20px; }
+.box li { margin: 2px 0; }
+.box.missing { background: var(--red-soft); color: var(--red); }
+.box.missing a { color: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.box ul.questions { list-style: none; padding-left: 0; }
+.box ul.questions > li { margin: 0; padding: 8px 0; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.box ul.questions > li:first-child { border-top: 0; padding-top: 2px; }
+.question-text { font-weight: 600; }
+.question-info { font-size: 12.5px; opacity: .85; margin-top: 2px; }
+.box.missing .btn { color: var(--text); }
+.question-value { display: inline-flex; gap: 4px; align-items: center; }
+.question-input { width: 120px; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 3px 7px; font-size: 13px; }
+.answered { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+.answered summary { cursor: pointer; }
+.answered ul { margin: 6px 0 0; padding-left: 20px; }
+.box.ok { background: var(--green-soft); color: var(--green); }
+.box.hint { background: var(--yellow-soft); color: var(--yellow); }
+.box.info { background: var(--accent-soft); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow); }
+.card > h3 { margin: 0 0 10px; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
+.card > h3 small { color: var(--muted); font-weight: 400; }
+.photos { display: flex; gap: 10px; flex-wrap: wrap; }
+.photo { position: relative; width: 132px; }
+.photo img { width: 132px; height: 132px; object-fit: cover; border-radius: 8px; display: block; cursor: zoom-in; background: var(--line); }
+.photo .cover { position: absolute; top: 6px; left: 6px; background: var(--accent); color: var(--accent-ink); font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.photo .controls { display: flex; justify-content: space-between; margin-top: 4px; }
+.photo.off img { opacity: .45; filter: grayscale(.6); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field .label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.field .label .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.field input, .field select, .field textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.field textarea { min-height: 170px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field.is-missing input, .field.is-missing select, .field.is-missing textarea { border-color: var(--red); background: var(--red-soft); }
+.field .help { font-size: 12.5px; color: var(--muted); }
+.field .help div + div { margin-top: 3px; }
+.card.is-missing { border-color: var(--red); }
+.field input[readonly], .field textarea[readonly] { opacity: .75; }
+.actions { position: fixed; bottom: 0; left: 330px; right: 0; z-index: 4; background: var(--panel); border-top: 1px solid var(--line);
+  padding: 10px 22px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.actions .text { flex: 1; color: var(--muted); font-size: 13.5px; min-width: 200px; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 20; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 96vw; max-height: 94vh; border-radius: 6px; }
+.toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 9px 16px; border-radius: 8px; z-index: 30; font-size: 14px; max-width: 90vw; }
+.toast[hidden] { display: none; }
+.keys { color: var(--muted); font-size: 12px; margin-top: 18px; }
+.segmented { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+.segmented button { border: 0; background: transparent; padding: 4px 12px; border-radius: 7px; cursor: pointer; font-size: 13.5px; }
+.segmented button[aria-pressed="true"] { background: var(--panel); box-shadow: var(--shadow); font-weight: 600; }
+.header-stats { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+.header-stats b { color: var(--text); font-weight: 600; }
+.header-right { display: flex; gap: 10px; align-items: center; margin-left: auto; }
+.chrome-status { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.chrome-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.chrome-status.on .dot { background: var(--green); }
+.header .filter { flex-basis: 100%; }
+body.table-mode .layout, body.table-mode .actions, body.table-mode .header .filter { display: none; }
+.table-view { padding: 18px 22px 120px; }
+.table-view[hidden] { display: none; }
+.view-header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.view-header .text { color: var(--muted); font-size: 13.5px; flex: 1; min-width: 240px; }
+.table-frame { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-weight: 600; font-size: 12.5px; color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.table img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: block; }
+.table .title-link { cursor: pointer; font-weight: 600; }
+.table .title-link:hover { text-decoration: underline; }
+.table .small { color: var(--muted); font-size: 12.5px; }
+.table input { width: 82px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 6px 8px; text-align: right; }
+.table input.empty { border-color: var(--red); background: var(--red-soft); }
+.table .choices { display: flex; gap: 4px; flex-wrap: wrap; }
+.table tfoot td { font-weight: 600; border-top: 1px solid var(--line); }
+/* Charts: views = blue, favorites = orange (checked for colour-vision deficiency, light + dark) */
+:root { --viz-1: #2a78d6; --viz-2: #eb6834; --viz-grid: #e1e0d9; --viz-axis: #c3c2b7; --viz-muted: #898781; --viz-good: #006300; }
+@media (prefers-color-scheme: dark) {
+  :root { --viz-1: #3987e5; --viz-2: #d95926; --viz-grid: #2c2c2a; --viz-axis: #383835; --viz-muted: #898781; --viz-good: #0ca30c; }
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.tile .label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.tile .value { font-size: 30px; font-weight: 600; line-height: 1.15; margin: 2px 0; }
+.tile .bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.tile .swatch { width: 10px; height: 2px; border-radius: 1px; display: inline-block; }
+.delta-plus { color: var(--viz-good); }
+.metric-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+@media (max-width: 980px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+.chart-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; position: relative; min-width: 0; }
+.chart-card h3 { margin: 0 0 2px; font-size: 14.5px; }
+.chart-card .subline { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.chart-area { width: 100%; }
+.chart-area svg { display: block; overflow: visible; }
+.chart-area svg text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--viz-muted); font-variant-numeric: tabular-nums; }
+.chart-area svg text.bar-label { fill: var(--muted); font-size: 12px; font-variant-numeric: normal; }
+.chart-area svg text.value-label { fill: var(--text); font-weight: 600; }
+.chart-area .bar { transition: opacity .12s; }
+.chart-area .row-active .bar { opacity: .78; }
+.viz-tip { position: absolute; pointer-events: none; z-index: 6; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.14); padding: 7px 10px; font-size: 12.5px; max-width: 280px; }
+.viz-tip[hidden] { display: none; }
+.viz-tip .row { display: flex; gap: 7px; align-items: center; }
+.viz-tip .row b { font-size: 13.5px; }
+.viz-tip .small { color: var(--muted); }
+.chart-card details { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.chart-card details table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.chart-card details td, .chart-card details th { padding: 3px 12px 3px 0; text-align: left; }
+.job { position: fixed; right: 16px; bottom: 76px; width: min(460px, calc(100vw - 32px)); z-index: 15; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; }
+.job[hidden] { display: none; }
+.job h3 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.job pre { margin: 0 0 8px; max-height: 190px; overflow-y: auto; font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--muted); }
+kbd { font: 11px ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+@media (max-width: 820px) {
+  .layout { grid-template-columns: 1fr; }
+  .list { position: static; max-height: none; border-right: 0; }
+  .actions { left: 0; padding: 10px 16px; }
+  .detail { padding: 14px 16px 130px; }
+  .grid { grid-template-columns: 1fr; }
+  body.mobile-detail .list { display: none; }
+  body:not(.mobile-detail) .detail, body:not(.mobile-detail) .actions { display: none; }
+  .back { display: inline-block; }
+  .photo, .photo img { width: 104px; } .photo img { height: 104px; }
+}
+</style>
+</head>
+<body>
+<header class="header">
+  <h1>Vinted Zentrale</h1>
+  <nav id="view-switch" class="segmented" aria-label="Ansicht"></nav>
+  <div id="header-stats" class="header-stats"></div>
+  <div class="header-right">
+    <span id="chrome-status" class="chrome-status"></span>
+    <button id="reload" class="btn" title="listings.json und Foto-Ordner neu einlesen">Neu laden</button>
+  </div>
+  <nav id="filter" class="filter" aria-label="Filter"></nav>
+</header>
+<main class="layout">
+  <aside id="list" class="list" aria-label="Inserate"></aside>
+  <section id="detail" class="detail"></section>
+</main>
+<section id="table-view" class="table-view" hidden></section>
+<div id="actions" class="actions" hidden></div>
+<div id="job" class="job" hidden></div>
+<div id="lightbox" class="lightbox" hidden><img alt=""></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+// Data values are English; the UI shows German labels.
+const STATUS_LABEL = { new: "Zu prüfen", on_hold: "Zurückgestellt", approved: "Freigegeben",
+  draft: "Entwurf bei Vinted", online: "Online", sold: "Verkauft" };
+const CONDITION_LABEL = { "New with tags": "Neu mit Etikett", "New without tags": "Neu ohne Etikett", "Very good": "Sehr gut",
+  "Good": "Gut", "Satisfactory": "Zufriedenstellend" };
+const PACKAGE_LABEL = { Small: "Klein", Medium: "Mittel", Large: "Groß" };
+const VALUE_LABEL = { status: STATUS_LABEL, condition: CONDITION_LABEL, package: PACKAGE_LABEL, brand: { "No brand": "Ohne Marke" } };
+const FILTERS = [["all", "Alle"], ["new", "Zu prüfen"], ["on_hold", "Zurückgestellt"], ["approved", "Freigegeben"],
+  ["draft", "Entwurf"], ["online", "Online"], ["sold", "Verkauft"]];
+const LOCKED = new Set(["draft", "online", "sold"]);
+const REQUIRED = [["title", "Titel"], ["description", "Beschreibung"], ["category", "Kategorie"],
+  ["brand", "Marke (oder „No brand“ für ohne Marke)"], ["size", "Größe"], ["condition", "Zustand"], ["package", "Paketgröße"]];
+const EMPTY = /^\s*(unbekannt|unklar|unknown|unclear|n\/?a|tbd|-|\?|\[\?[^\]]*\])?\s*$/i;
+const PLACEHOLDER = /\[\?/;
+const TEXT_CHECKS = [["title", "Titel"], ["description", "Beschreibung"], ["category", "Kategorie"], ["brand", "Marke"],
+  ["size", "Größe"], ["color", "Farbe"], ["material", "Material"], ["shape", "Schuhform"], ["heel_height", "Absatzhöhe"]];
+const FIELD_NAME = Object.fromEntries([...TEXT_CHECKS, ["condition", "Zustand"], ["package", "Paketgröße"], ["price", "Preis"],
+  ["min_price", "Mindestpreis"], ["notes", "Notiz"], ["photos", "Fotos"], ["status", "Status"]]);
+
+let D = null;            // response of /api/data
+let current = null;      // folder of the selected listing
+let filter = remember("filter") || "all";
+let pending = {};        // unsaved changes {folder, fields}
+let saveTimer = null;
+let saveChain = Promise.resolve();
+let SERVER_STATE = {};   // folder -> values as last delivered by the server (base against overwriting)
+let CONFLICTS = {};      // folder -> {field: your unsaved input}
+let photosBusy = false;
+let lightboxIndex = -1;
+let view = ["prices", "stats"].includes(remember("view")) ? remember("view") : "listings";
+let STATS = null;                              // from /api/stats (history of fetches)
+let LIVE = { chrome: false, job: null };       // from /api/status
+let jobDismissed = false;                      // job window closed after it finished
+const num = (v) => Number(String(v ?? "").replace(/[€\s]/g, "").replace(/[.,]-$/, "").replace(",", "."));
+const clone = (x) => JSON.parse(JSON.stringify(x ?? null));
+const rememberServer = (i) => { SERVER_STATE[i.folder] = clone(i); };
+
+function remember(k, v) {
+  try { if (v === undefined) return localStorage.getItem("vh_" + k); localStorage.setItem("vh_" + k, v); } catch (e) { return null; }
+}
+
+// German display text for an English stored value (status, condition, package)
+function displayValue(key, v) {
+  const map = VALUE_LABEL[key];
+  return map && Object.prototype.hasOwnProperty.call(map, v) ? map[v] : v;
+}
+
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (v === true) el.setAttribute(k, "");
+    else el.setAttribute(k, v);
+  }
+  for (const child of children.flat()) {
+    if (child === null || child === undefined || child === false) continue;
+    el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return el;
+}
+
+function setChildren(el, ...children) {
+  el.replaceChildren(...children.flat().filter((k) => k !== null && k !== undefined && k !== false));
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const err = new Error(d.error || r.statusText);
+    err.status = r.status; err.data = d;
+    throw err;
+  }
+  return d;
+}
+
+function toast(text) {
+  const t = document.getElementById("toast");
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 3200);
+}
+
+const byFolder = (folder) => D.listings.find((i) => i.folder === folder);
+const visibleListings = () => D.listings.filter((i) => filter === "all" || i.status === filter);
+const imageUrl = (i, file, w) => `/image/${encodeURIComponent(i.folder)}/${encodeURIComponent(file)}?w=${w}`;
+
+const openQuestions = (i) => (i.questions || []).filter((q) => !q.answer);
+
+function missingItems(i) {
+  const f = [];
+  const questions = openQuestions(i);
+  const perQuestion = new Set(questions.map((q) => q.field).filter(Boolean));
+  if (i._folder_missing) f.push({ field: null, text: "Foto-Ordner existiert nicht mehr" });
+  for (const q of questions) f.push({ field: q.field || null, question: q });
+  if (!(i.photos || []).length) f.push({ field: "photos", text: "Mindestens ein Foto auswählen" });
+  for (const [k, name] of REQUIRED) if (!perQuestion.has(k) && EMPTY.test(i[k] ?? "")) f.push({ field: k, text: `${name} fehlt` });
+  // Placeholders without an open question must be removed by hand
+  if (!questions.length) for (const [k, name] of TEXT_CHECKS)
+    if (!EMPTY.test(i[k] ?? "") && PLACEHOLDER.test(i[k] || "")) f.push({ field: k, text: `${name}: Platzhalter [? …] ersetzen oder löschen` });
+  const price = num(i.price);
+  if (String(i.price ?? "").trim() && !Number.isFinite(price)) f.push({ field: "price", text: "Preis ist keine gültige Zahl" });
+  else if (!(price > 0)) f.push({ field: "price", text: "Preis fehlt" });
+  return f;
+}
+
+function tips(i) {
+  const t = [];
+  const n = (i.photos || []).length;
+  if (n > 0 && n < 3) t.push("Weniger als 3 Fotos: Käufer wollen Seite, Sohle und Größenetikett sehen.");
+  if (n > 20) t.push(`Vinted nimmt höchstens 20 Fotos, die letzten ${n - 20} werden beim Hochladen weggelassen.`);
+  if ((i._missing_photos || []).length) t.push("Nicht mehr im Ordner: " + i._missing_photos.join(", "));
+  if (EMPTY.test(i.color ?? "")) t.push("Farbe ist leer (optional, hilft aber bei der Suche).");
+  if ((i.title || "").length > 60) t.push("Titel ist lang: das Wichtigste (Marke, Typ, Größe) nach vorn.");
+  if (num(i.min_price) > 0 && num(i.price) > 0 && num(i.min_price) > num(i.price)) t.push("Mindestpreis liegt über dem Preis.");
+  const vp = i.vinted_price;
+  if (vp && vp.premium && num(i.price) > vp.premium * 1.3)
+    t.push(`Dein Preis liegt deutlich über Vinteds Empfehlung (optimal ${vp.optimal} €, premium ${vp.premium} €). Das kann den Verkauf bremsen.`);
+  return t;
+}
+
+/* ---------- Loading & rendering ---------- */
+
+async function load() {
+  try { await saveNow(); } catch (e) { return false; }
+  try {
+    D = await api("/api/data");
+  } catch (e) {
+    document.getElementById("detail").replaceChildren(h("div", { class: "box missing" }, "Daten konnten nicht geladen werden: " + e.message));
+    return false;
+  }
+  SERVER_STATE = {};
+  D.listings.forEach(rememberServer);
+  if (!current || !byFolder(current)) current = (visibleListings()[0] || D.listings[0] || {}).folder || null;
+  renderAll();
+  return true;
+}
+
+// Did someone else (e.g. Claude) change listings.json? Then reload when the tab regains focus.
+async function checkVersion() {
+  if (!D || document.hidden || pending.fields) return;
+  try {
+    const { version } = await api("/api/version");
+    if (version !== D.version) {
+      await saveChain.catch(() => {});
+      if (!pending.fields && await load()) toast("Die Inserate wurden inzwischen geändert und neu geladen.");
+    }
+  } catch (e) { /* server briefly unreachable */ }
+}
+
+function renderAll() {
+  const table = view === "prices" || view === "stats";
+  document.body.classList.toggle("table-mode", table);
+  document.getElementById("table-view").hidden = !table;
+  renderHeader();
+  if (view === "prices") renderPrices();
+  else if (view === "stats") renderStats();
+  else { renderFilter(); renderList(); renderDetail(); }
+}
+
+async function loadStats() {
+  try { STATS = await api("/api/stats"); } catch (e) { STATS = { history: [] }; toast("Statistik nicht ladbar: " + e.message); }
+  if (view === "stats") renderStats();
+}
+
+const vintedStatus = (a) => a.sold ? "Verkauft" : a.reserved ? "Reserviert" : a.draft ? "Entwurf" : a.hidden ? "Versteckt" : "Online";
+const timeText = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–";
+const delta = (now, old) => (old === undefined || old === null || now === old) ? null
+  : h("span", { class: now > old ? "badge-ok" : "badge-missing", style: "margin-left:6px" }, `${now > old ? "+" : ""}${now - old}`);
+
+/* ---------- Charts (plain SVG, no external libraries) ---------- */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function s(tag, attrs, ...children) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined) el.setAttribute(k, v);
+  for (const child of children.flat()) if (child !== null && child !== undefined) el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  return el;
+}
+const METRICS = { views: { name: "Aufrufe", color: "var(--viz-1)" }, favorites: { name: "Favoriten", color: "var(--viz-2)" } };
+let metric = remember("metric") === "favorites" ? "favorites" : "views";
+const swatch = (color) => h("span", { class: "swatch", style: `background:${color}` });
+
+function niceScale(max) {
+  if (!(max > 0)) return { max: 4, step: 1 };
+  const raw = max / 4, p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
+  const step = Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p);
+  return { max: Math.ceil(max / step) * step, step };
+}
+
+let textMeasurer = null;
+function truncate(text, width) {
+  textMeasurer = textMeasurer || document.createElement("canvas").getContext("2d");
+  textMeasurer.font = '12px system-ui, -apple-system, "Segoe UI", sans-serif';
+  if (textMeasurer.measureText(text).width <= width) return text;
+  let t = text;
+  while (t.length > 1 && textMeasurer.measureText(t + "…").width > width) t = t.slice(0, -1);
+  return t + "…";
+}
+
+function showTip(card, tip, event, content) {
+  setChildren(tip, content);
+  tip.hidden = false;
+  const r = card.getBoundingClientRect();
+  let x = event.clientX - r.left + 14, y = event.clientY - r.top + 14;
+  if (x + tip.offsetWidth > r.width - 4) x = event.clientX - r.left - tip.offsetWidth - 14;
+  if (y + tip.offsetHeight > r.height - 4) y = event.clientY - r.top - tip.offsetHeight - 10;
+  tip.style.left = Math.max(4, x) + "px"; tip.style.top = Math.max(4, y) + "px";
+}
+
+// Total over all fetches (one line, one axis)
+function lineChart(card, tip, points, m, width) {
+  const H = 210, padT = 16, padB = 30, padL = 34, padR = 34;
+  const w = Math.max(260, width), innerW = w - padL - padR, innerH = H - padT - padB;
+  const { max, step } = niceScale(Math.max(...points.map((p) => p.value)));
+  const t0 = points[0].time, t1 = points[points.length - 1].time;
+  const x = (t) => points.length === 1 || t1 === t0 ? padL + innerW / 2 : padL + (t - t0) / (t1 - t0) * innerW;
+  const y = (v) => padT + innerH - (v / max) * innerH;
+  const svg = s("svg", { width: w, height: H, role: "img", "aria-label": `${m.name} gesamt pro Abruf` });
+  for (let v = 0; v <= max; v += step) {
+    svg.append(s("line", { x1: padL, x2: w - padR, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--viz-axis)" : "var(--viz-grid)", "stroke-width": 1 }));
+    svg.append(s("text", { x: padL - 7, y: y(v) + 4, "text-anchor": "end" }, v.toLocaleString("de-DE")));
+  }
+  const multiDay = t1 - t0 > 2 * 86400000;
+  const dateText = (t) => new Date(t).toLocaleString("de-DE", multiDay ? { day: "2-digit", month: "2-digit" } : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const maxTicks = Math.max(1, Math.min(points.length, Math.floor(innerW / 90)));
+  const ticks = points.length === 1 ? [0] : [...new Set(Array.from({ length: maxTicks }, (_, k) => Math.round(k * (points.length - 1) / Math.max(1, maxTicks - 1))))];
+  for (const i of ticks) {
+    const anchor = points.length === 1 ? "middle" : i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
+    svg.append(s("text", { x: x(points[i].time), y: H - 9, "text-anchor": anchor }, dateText(points[i].time)));
+  }
+  if (points.length > 1) {
+    const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.time).toFixed(1)},${y(p.value).toFixed(1)}`).join("");
+    svg.append(s("path", { d: `${d}L${x(t1)},${y(0)}L${x(t0)},${y(0)}Z`, fill: m.color, "fill-opacity": 0.1 }));
+    svg.append(s("path", { d, fill: "none", stroke: m.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  }
+  const last = points[points.length - 1];
+  svg.append(s("circle", { cx: x(t1), cy: y(last.value), r: 4, fill: m.color, stroke: "var(--panel)", "stroke-width": 2 }));
+  svg.append(s("text", { x: x(t1) + 9, y: y(last.value) + 4, class: "value-label" }, last.value.toLocaleString("de-DE")));
+  // Crosshair: snaps to the nearest fetch
+  const rule = s("line", { y1: padT, y2: padT + innerH, stroke: "var(--viz-axis)", "stroke-width": 1, visibility: "hidden" });
+  const dot = s("circle", { r: 4, fill: m.color, stroke: "var(--panel)", "stroke-width": 2, visibility: "hidden" });
+  const hit = s("rect", { x: padL, y: padT, width: innerW, height: innerH, fill: "transparent" });
+  svg.append(rule, dot, hit);
+  hit.addEventListener("pointermove", (e) => {
+    const px = e.clientX - svg.getBoundingClientRect().left;
+    const p = points.reduce((a, b) => Math.abs(x(b.time) - px) < Math.abs(x(a.time) - px) ? b : a);
+    rule.setAttribute("x1", x(p.time)); rule.setAttribute("x2", x(p.time)); rule.setAttribute("visibility", "visible");
+    dot.setAttribute("cx", x(p.time)); dot.setAttribute("cy", y(p.value)); dot.setAttribute("visibility", "visible");
+    showTip(card, tip, e, [h("div", { class: "row" }, swatch(m.color), h("b", {}, p.value.toLocaleString("de-DE")), m.name),
+      h("div", { class: "small" }, timeText(new Date(p.time).toISOString()))]);
+  });
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; rule.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  return svg;
+}
+
+// Current value per listing as horizontal bars (one colour, sorted)
+function barChart(card, tip, rows, m, key, width, previous) {
+  const rowH = 28, thick = 14, padT = 4, padB = 24;
+  const w = Math.max(260, width), labelW = Math.min(240, Math.round(w * 0.42)), padR = 34;
+  const innerW = w - labelW - padR, H = padT + rows.length * rowH + padB;
+  const { max, step } = niceScale(Math.max(...rows.map((a) => a[key])));
+  const x = (v) => labelW + (v / max) * innerW;
+  const svg = s("svg", { width: w, height: H, role: "img", "aria-label": `${m.name} je Inserat` });
+  for (let v = 0; v <= max; v += step) {
+    svg.append(s("line", { x1: x(v), x2: x(v), y1: padT, y2: H - padB, stroke: v === 0 ? "var(--viz-axis)" : "var(--viz-grid)", "stroke-width": 1 }));
+    svg.append(s("text", { x: x(v), y: H - 8, "text-anchor": "middle" }, v.toLocaleString("de-DE")));
+  }
+  rows.forEach((a, n) => {
+    const yMid = padT + n * rowH + rowH / 2, y0 = yMid - thick / 2, bw = x(a[key]) - labelW, r = 4;
+    const group = s("g", {});
+    group.append(s("text", { x: labelW - 8, y: yMid + 4, "text-anchor": "end", class: "bar-label" }, truncate(a.title, labelW - 14)));
+    if (bw >= r) group.append(s("path", { class: "bar", fill: m.color,
+      d: `M${labelW},${y0}h${bw - r}a${r},${r} 0 0 1 ${r},${r}v${thick - 2 * r}a${r},${r} 0 0 1 ${-r},${r}h${-(bw - r)}Z` }));
+    else if (bw > 0) group.append(s("rect", { class: "bar", x: labelW, y: y0, width: bw, height: thick, fill: m.color }));
+    group.append(s("text", { x: x(a[key]) + 6, y: yMid + 4, class: "value-label" }, a[key].toLocaleString("de-DE")));
+    const hit = s("rect", { x: 0, y: yMid - rowH / 2, width: w, height: rowH, fill: "transparent" });
+    group.append(hit);
+    hit.addEventListener("pointermove", (e) => {
+      group.classList.add("row-active");
+      const old = previous[a.id];
+      const change = old && a[key] !== old[key] ? ` (${a[key] > old[key] ? "+" : ""}${a[key] - old[key]} seit letztem Abruf)` : "";
+      showTip(card, tip, e, [h("div", { class: "row" }, swatch(m.color), h("b", {}, a[key].toLocaleString("de-DE")), m.name + change),
+        h("div", {}, a.title),
+        h("div", { class: "small" }, `${a.views} Aufrufe · ${a.favorites} Favoriten · ${euro(a.price)}`)]);
+    });
+    hit.addEventListener("pointerleave", () => { group.classList.remove("row-active"); tip.hidden = true; });
+    svg.append(group);
+  });
+  return svg;
+}
+
+function sparkline(values, color) {
+  const w = 84, height = 22;
+  if (values.length < 2) return h("span", { class: "small" }, values.length ? "erst 1 Abruf" : "–");
+  const max = Math.max(1, ...values);
+  const pt = values.map((v, i) => [2 + i * (w - 8) / (values.length - 1), height - 4 - (v / max) * (height - 8)]);
+  const svg = s("svg", { width: w, height, role: "img", "aria-label": `Verlauf: ${values.join(", ")}` },
+    s("path", { d: pt.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(""), fill: "none",
+      stroke: "var(--viz-muted)", "stroke-width": 1.5, "stroke-linejoin": "round", "stroke-linecap": "round" }),
+    s("circle", { cx: pt[pt.length - 1][0], cy: pt[pt.length - 1][1], r: 3, fill: color, stroke: "var(--panel)", "stroke-width": 1.5 }));
+  return svg;
+}
+
+function tile(title, value, old, historyValues, color) {
+  const diff = old === undefined ? null : value - old;
+  return h("div", { class: "tile" },
+    h("div", { class: "label" }, color ? swatch(color) : null, title),
+    h("div", { class: "value" }, value.toLocaleString("de-DE")),
+    h("div", { class: "bottom" },
+      diff === null ? h("span", {}, historyValues ? "erster Abruf" : "aktuell bei Vinted")
+        : h("span", { class: diff > 0 ? "delta-plus" : null }, diff > 0 ? `▲ +${diff} seit letztem Abruf` : diff < 0 ? `▼ ${diff} seit letztem Abruf` : "± 0 seit letztem Abruf"),
+      historyValues && historyValues.length > 1 ? sparkline(historyValues.slice(-12), color || "var(--viz-1)") : null));
+}
+
+function renderStats() {
+  const area = document.getElementById("table-view");
+  if (!STATS) { setChildren(area, h("div", { class: "help" }, "Lädt …")); loadStats(); return; }
+  const history = STATS.history || [];
+  const running = LIVE.job && LIVE.job.running;
+  const button = h("button", { class: "btn primary", disabled: !LIVE.chrome || running,
+    title: !LIVE.chrome ? "Erst oben den Vinted-Chrome öffnen" : null, onclick: () => startJob("stats") }, "Statistik abrufen");
+  const header = h("div", { class: "view-header" },
+    h("div", { class: "text" }, history.length
+      ? `Letzter Abruf: ${timeText(history[history.length - 1].time)} · ${history.length} Abruf${history.length === 1 ? "" : "e"} gespeichert. `
+      : "Noch kein Abruf. ",
+      "„Statistik abrufen“ öffnet dein Vinted-Profil im Vinted-Chrome und liest Aufrufe und Favoriten aller Inserate (nur lesen). Jeder Abruf wird gespeichert, so siehst du die Entwicklung."),
+    button);
+  if (!history.length) { setChildren(area, header); return; }
+  const latest = history[history.length - 1].items;
+  const previous = history.length > 1 ? Object.fromEntries(history[history.length - 2].items.map((a) => [a.id, a])) : {};
+  const firstSeen = {};
+  for (const snap of history) for (const a of snap.items) if (!(a.id in firstSeen)) firstSeen[a.id] = snap.time;
+  const series = (id) => history.slice(-8).map((snap) => (snap.items.find((a) => a.id === id) || {}).views).filter((x) => x !== undefined);
+  const byVintedId = Object.fromEntries((D ? D.listings : []).filter((i) => i.vinted_id).map((i) => [i.vinted_id, i]));
+  const total = (k) => latest.reduce((sum, a) => sum + (a[k] || 0), 0);
+  const rows = [...latest].sort((a, b) => b.views - a.views || b.favorites - a.favorites);
+
+  // Totals per fetch for tiles and the history chart
+  const totals = history.map((st) => ({ time: new Date(st.time).getTime(), iso: st.time,
+    views: st.items.reduce((x, a) => x + (a.views || 0), 0), favorites: st.items.reduce((x, a) => x + (a.favorites || 0), 0) }));
+  const now = totals[totals.length - 1], before = totals.length > 1 ? totals[totals.length - 2] : null;
+  const online = latest.filter((a) => !a.sold && !a.draft).length;
+  const m = METRICS[metric];
+  const tipLine = h("div", { class: "viz-tip", hidden: true }), tipBars = h("div", { class: "viz-tip", hidden: true });
+  const areaLine = h("div", { class: "chart-area" }), areaBars = h("div", { class: "chart-area" });
+  const cardLine = h("div", { class: "chart-card" },
+    h("h3", {}, `${m.name} gesamt pro Abruf`),
+    h("div", { class: "subline" }, totals.length > 1 ? `${totals.length} Abrufe seit ${timeText(totals[0].iso)}`
+      : "Erst ein Abruf – ab dem zweiten Abruf entsteht hier eine Linie."),
+    areaLine, tipLine,
+    h("details", {}, h("summary", { style: "cursor:pointer" }, "Werte als Tabelle"),
+      h("table", {}, h("tr", {}, h("th", {}, "Abruf"), h("th", {}, "Aufrufe"), h("th", {}, "Favoriten")),
+        [...totals].reverse().map((p) => h("tr", {}, h("td", {}, timeText(p.iso)), h("td", {}, p.views), h("td", {}, p.favorites))))));
+  const cardBars = h("div", { class: "chart-card" },
+    h("h3", {}, `${m.name} je Inserat`),
+    h("div", { class: "subline" }, `Stand ${timeText(now.iso)} · alle Werte auch in der Tabelle unten`),
+    areaBars, tipBars);
+  const barRows = [...latest].sort((a, b) => b[metric] - a[metric] || b.views - a.views);
+
+  setChildren(area, header,
+    h("div", { class: "tiles" },
+      tile("Aufrufe gesamt", now.views, before ? before.views : undefined, totals.map((p) => p.views), "var(--viz-1)"),
+      tile("Favoriten gesamt", now.favorites, before ? before.favorites : undefined, totals.map((p) => p.favorites), "var(--viz-2)"),
+      tile("Inserate online", online, undefined, null, null)),
+    h("div", { class: "metric-row" }, "Diagramme zeigen:",
+      h("div", { class: "segmented" }, Object.entries(METRICS).map(([k, v]) =>
+        h("button", { "aria-pressed": String(metric === k), onclick: () => { metric = k; remember("metric", k); renderStats(); } }, v.name)))),
+    h("div", { class: "charts" }, cardLine, cardBars),
+    h("div", { class: "table-frame" }, h("table", { class: "table" },
+      h("thead", {}, h("tr", {}, ["", "Inserat", "Status", "Preis", "Aufrufe", "Favoriten", "Verlauf Aufrufe", "Erstmals gesehen"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, rows.map((a) => {
+        const i = byVintedId[a.id];
+        const old = previous[a.id] || {};
+        return h("tr", {},
+          h("td", {}, i && (i.photos || [])[0] ? h("img", { src: imageUrl(i, i.photos[0], 360), alt: "", loading: "lazy" }) : null),
+          h("td", {}, h("a", { class: "title-link", href: a.url, target: "_blank", rel: "noopener", style: "color:inherit" }, a.title),
+            i ? h("div", { class: "small" }, h("span", { class: "title-link", onclick: () => showView("listings", i.folder) }, "in der Zentrale öffnen"))
+              : h("div", { class: "small" }, "nicht in der Zentrale")),
+          h("td", {}, vintedStatus(a)),
+          h("td", { style: "white-space:nowrap" }, euro(a.price)),
+          h("td", { style: "white-space:nowrap" }, h("b", {}, a.views), delta(a.views, old.views)),
+          h("td", { style: "white-space:nowrap" }, h("b", {}, a.favorites), delta(a.favorites, old.favorites)),
+          h("td", { title: series(a.id).join(" → ") }, sparkline(series(a.id), "var(--viz-1)")),
+          h("td", { class: "small", style: "white-space:nowrap" }, timeText(firstSeen[a.id])));
+      })),
+      h("tfoot", {}, h("tr", {}, h("td", {}), h("td", {}, `${latest.length} Artikel bei Vinted`), h("td", {}), h("td", {}),
+        h("td", {}, total("views")), h("td", {}, total("favorites")), h("td", {}), h("td", {}))))));
+
+  // Draw charts only once the card width is known
+  const points = totals.map((p) => ({ time: p.time, value: p[metric] }));
+  areaLine.append(lineChart(cardLine, tipLine, points, m, areaLine.clientWidth));
+  areaBars.append(barChart(cardBars, tipBars, barRows, m, metric, areaBars.clientWidth, previous));
+}
+
+// Redraw charts when the window is resized
+let statsWidth = 0, statsTimer = null;
+new ResizeObserver((entries) => {
+  const b = Math.round(entries[0].contentRect.width);
+  if (view !== "stats" || !STATS || Math.abs(b - statsWidth) < 8) return;
+  statsWidth = b;
+  clearTimeout(statsTimer); statsTimer = setTimeout(renderStats, 120);
+}).observe(document.getElementById("table-view"));
+
+function showView(v, folder) {
+  view = v; remember("view", v);
+  if (folder) current = folder;
+  if (v === "stats") loadStats();
+  renderAll();
+  window.scrollTo({ top: 0 });
+}
+
+function renderHeader() {
+  setChildren(document.getElementById("view-switch"),
+    [["listings", "Inserate"], ["prices", "Preise"], ["stats", "Statistik"]].map(([k, name]) =>
+      h("button", { "aria-pressed": String(view === k), onclick: () => showView(k) }, name)));
+  const count = (st) => D.listings.filter((i) => st.includes(i.status)).length;
+  const sold = D.listings.filter((i) => i.status === "sold");
+  const revenue = sold.reduce((sum, i) => sum + (num(i.price) || 0), 0);
+  const withoutPrice = D.listings.filter((i) => !LOCKED.has(i.status) && !(num(i.price) > 0)).length;
+  setChildren(document.getElementById("header-stats"),
+    h("b", {}, D.listings.length), " Paare · ", h("b", {}, count(["new", "on_hold"])), " zu prüfen · ",
+    h("b", {}, count(["approved"])), " freigegeben · ", h("b", {}, count(["draft", "online"])), " bei Vinted · ",
+    h("b", {}, sold.length), ` verkauft (${euro(revenue)})`,
+    withoutPrice ? [" · ", h("b", {}, withoutPrice), " ohne Preis"] : null);
+  renderChrome();
+}
+
+function renderChrome() {
+  const el = document.getElementById("chrome-status");
+  el.classList.toggle("on", !!LIVE.chrome);
+  const approved = D ? D.listings.filter((i) => i.status === "approved").length : 0;
+  const running = LIVE.job && LIVE.job.running;
+  const atVinted = D ? D.listings.filter((i) => i.status === "online" || i.status === "draft").length : 0;
+  setChildren(el,
+    LIVE.chrome && approved && !running ? h("button", { class: "btn small", style: "margin-right:6px",
+      title: "Füllt die freigegebenen Inserate nacheinander im Vinted-Chrome aus. Nach jedem wartet es, bis du selbst abgeschickt hast.",
+      onclick: () => startJob("fill_approved") }, `Alle freigegebenen ausfüllen (${approved})`) : null,
+    LIVE.chrome && atVinted && !running ? h("button", { class: "btn small", style: "margin-right:6px",
+      title: "Liest Aufrufe und Favoriten aller deiner Vinted-Inserate und speichert sie im Verlauf (nur lesen).",
+      onclick: () => startJob("stats") }, "Statistik abrufen") : null,
+    h("span", { class: "dot" }), LIVE.chrome ? "Vinted-Chrome offen" : "Vinted-Chrome zu",
+    LIVE.chrome ? null : h("button", { class: "btn small", onclick: openChrome }, "Öffnen"));
+}
+
+async function openChrome() {
+  try {
+    await api("/api/chrome/open", {});
+    toast("Vinted-Chrome wird geöffnet. Beim ersten Mal dort selbst einloggen.");
+    setTimeout(pollStatus, 2500);
+  } catch (e) { toast("Fehler: " + e.message); }
+}
+
+async function startJob(name, folder) {
+  try {
+    await saveNow();
+    LIVE.job = await api("/api/job", { name, folder: folder || "" });
+    jobDismissed = false;
+    renderJob();
+    schedulePoll(1500);
+  } catch (e) { toast(e.message); }
+}
+
+async function stopJob() {
+  try { LIVE.job = await api("/api/job/stop", {}); renderJob(); } catch (e) { toast(e.message); }
+}
+
+function renderJob() {
+  const box = document.getElementById("job");
+  const j = LIVE.job;
+  if (!j || (!j.running && (j.exit_code === null || jobDismissed)) || !j.title) { box.hidden = true; return; }
+  box.hidden = false;
+  const i = j.folder && D && byFolder(j.folder);
+  setChildren(box,
+    h("h3", {}, j.running ? "⏳" : (j.exit_code === 0 ? "✓" : "⚠"), j.title),
+    i ? h("div", { class: "help", style: "margin-bottom:6px;font-size:13px" }, i.title) : null,
+    j.running ? h("div", { style: "font-size:13px;margin-bottom:6px" },
+      "Läuft im Vinted-Chrome. Prüfe dort das Formular und klicke selbst auf „Save draft“ oder „Upload“.") : null,
+    h("pre", {}, (j.log || []).slice(-12).join("\n") || "…"),
+    h("div", { class: "tools", style: "margin-top:0" },
+      j.running ? h("button", { class: "btn small", onclick: stopJob }, "Abbrechen")
+                : h("button", { class: "btn small", onclick: () => { jobDismissed = true; renderJob(); } }, "Schließen")));
+  const pre = box.querySelector("pre"); pre.scrollTop = pre.scrollHeight;
+}
+
+// Poll regularly: Chrome open? Job done? File changed from outside?
+let pollTimer = null;
+function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(pollStatus, ms); }
+async function pollStatus() {
+  let next = 5000;
+  try {
+    const wasRunning = LIVE.job && LIVE.job.running;
+    const st = await api("/api/status");
+    LIVE.chrome = st.chrome; LIVE.job = st.job;
+    renderChrome(); renderJob();
+    if (D && view === "listings") renderActions();
+    if (st.job.running) next = 1500;
+    if (wasRunning && !st.job.running && view === "stats") loadStats();
+    const typing = document.activeElement && document.activeElement.matches("input, textarea, select");
+    if (D && st.version !== D.version && !pending.fields && !typing && !document.hidden) {
+      await saveChain.catch(() => {});
+      if (await load() && wasRunning && !st.job.running) toast("Auftrag fertig, Daten aktualisiert.");
+    }
+  } catch (e) { /* server briefly unreachable */ }
+  schedulePoll(next);
+}
+
+function renderFilter() {
+  const nav = document.getElementById("filter");
+  nav.replaceChildren(...FILTERS.map(([k, name]) => {
+    const n = k === "all" ? D.listings.length : D.listings.filter((i) => i.status === k).length;
+    if (n === 0 && k !== "all" && k !== filter) return null;
+    return h("button", { class: "chip", "aria-pressed": String(filter === k), onclick: () => { filter = k; remember("filter", k); renderAll(); } },
+      name, h("span", { class: "n" }, n));
+  }).filter(Boolean));
+}
+
+function renderList() {
+  const list = document.getElementById("list");
+  const entries = visibleListings();
+  if (!entries.length) {
+    list.replaceChildren(h("div", { class: "empty-list" }, D.listings.length
+      ? "Keine Inserate mit diesem Status."
+      : "Noch keine Artikel. Lege pro Artikel einen Ordner mit Fotos im Artikel-Ordner an und lass Claude die Inserate erstellen."));
+    return;
+  }
+  list.replaceChildren(...entries.map((i) => {
+    const f = missingItems(i);
+    const first = (i.photos || [])[0];
+    return h("div", { class: "item", "aria-current": String(i.folder === current), "data-folder": i.folder, onclick: () => selectListing(i.folder, true) },
+      first ? h("img", { src: imageUrl(i, first, 360), alt: "", loading: "lazy" }) : h("div", { class: "no-image" }),
+      h("div", { style: "min-width:0" },
+        h("div", { class: "t" }, i.title || i.folder),
+        h("div", { class: "row" },
+          h("span", { class: `pill s-${i.status}` }, STATUS_LABEL[i.status] || i.status),
+          LOCKED.has(i.status) ? null : (f.length ? h("span", { class: "badge-missing" }, `${f.length} fehlt`) : h("span", { class: "badge-ok" }, "vollständig")),
+          i.vinted_stats ? h("span", { class: "pill", style: "border-color:transparent;color:var(--muted)",
+            title: `Stand ${timeText(i.vinted_stats.time)}` }, `👁 ${i.vinted_stats.views} · ♥ ${i.vinted_stats.favorites}`) : null,
+          i.price ? h("span", { class: "pill", style: "border-color:transparent;color:var(--muted)" }, `${String(i.price).replace(".", ",")} €`) : null)));
+  }));
+}
+
+async function selectListing(folder, mobile) {
+  try { await saveNow(); } catch (e) { return; }
+  current = folder;
+  if (mobile) document.body.classList.add("mobile-detail");
+  renderList(); renderDetail();
+  window.scrollTo({ top: 0 });
+}
+
+function renderDetail() {
+  const detail = document.getElementById("detail");
+  const actions = document.getElementById("actions");
+  const i = current && byFolder(current);
+  if (!i) { detail.replaceChildren(); actions.hidden = true; return; }
+  const locked = LOCKED.has(i.status);
+
+  const header = h("div", { class: "detail-header" },
+    h("button", { class: "btn back", onclick: () => document.body.classList.remove("mobile-detail") }, "← Liste"),
+    h("div", { class: "title-block" },
+      h("div", { class: "folder" }, i.folder),
+      h("h2", { id: "header-title" }, i.title || "(noch kein Titel)")),
+    h("span", { class: `pill s-${i.status}`, style: "margin-top:6px" }, STATUS_LABEL[i.status] || i.status),
+    h("div", { id: "save-state", class: "save-state" }));
+
+  const noText = !i.title && !i.description && !(i.hints || []).length;
+  setChildren(detail,
+    header,
+    noText ? h("div", { class: "box info" }, "Für diesen Ordner gibt es noch keinen Inseratstext. Sag Claude z. B.: „Analysiere die neuen Ordner und fülle die Inserate aus.“") : null,
+    renderConflicts(i),
+    h("div", { id: "missing-box" }),
+    (i.hints || []).length ? h("div", { class: "box hint" }, h("h3", {}, "Hinweise aus der Foto-Analyse"),
+      h("ul", {}, i.hints.map((t) => h("li", {}, t)))) : null,
+    locked ? h("div", { class: "box info" }, "Dieses Inserat ist schon bei Vinted. Änderungen hier ändern es dort nicht, deshalb sind die Felder gesperrt.") : null,
+    renderPhotos(i, locked),
+    renderFields(i, locked),
+    renderAnalysis(i),
+    h("div", { class: "keys" }, h("kbd", {}, "↑"), " ", h("kbd", {}, "↓"), " vorheriges/nächstes Inserat",
+      i.status === "new" || i.status === "on_hold" ? [" · ", h("kbd", {}, "Strg"), "+", h("kbd", {}, "Enter"), " freigeben"] : null));
+  renderMissing();
+  renderActions();
+}
+
+function renderConflicts(i) {
+  const k = CONFLICTS[i.folder];
+  if (!k || !Object.keys(k).length) return null;
+  const adopt = (field) => {
+    const value = k[field];
+    delete k[field];
+    i[field] = value;
+    save({ [field]: value }, true);
+    renderDetail(); renderList();
+  };
+  const discard = (field) => { delete k[field]; renderDetail(); };
+  return h("div", { class: "box missing" },
+    h("h3", {}, "Dieses Inserat wurde inzwischen woanders geändert (z. B. von Claude)"),
+    h("div", { style: "margin-bottom:6px" }, "Oben steht jetzt der neue Stand. Deine Eingabe wurde nicht gespeichert:"),
+    Object.entries(k).map(([field, value]) => h("div", { style: "margin:8px 0" },
+      h("strong", {}, (FIELD_NAME[field] || field) + ": "),
+      h("span", { style: "white-space:pre-wrap" }, Array.isArray(value) ? value.join(", ") : String(displayValue(field, value) ?? "")),
+      h("div", { class: "tools" },
+        h("button", { class: "btn small", onclick: () => adopt(field) }, "Meine Version übernehmen"),
+        h("button", { class: "btn small", onclick: () => discard(field) }, "Verwerfen")))));
+}
+
+function renderMissing() {
+  const i = byFolder(current); const box = document.getElementById("missing-box");
+  if (!i || !box) return;
+  if (LOCKED.has(i.status)) { box.replaceChildren(); return; }
+  const f = missingItems(i); const t = tips(i);
+  document.querySelectorAll(".is-missing").forEach((el) => el.classList.remove("is-missing"));
+  f.forEach((x) => x.field && document.querySelector(`#detail [data-field="${x.field}"]`)?.classList.add("is-missing"));
+  const answered = (i.questions || []).filter((q) => q.answer);
+  const last = (i.history || []).slice(-1)[0];
+  setChildren(box,
+    f.length
+      ? h("div", { class: "box missing" }, h("h3", {}, `Fehlt noch (${f.length})`),
+          h("ul", { class: "questions" }, f.map((x) => h("li", {}, x.question ? renderQuestion(i, x.question)
+            : x.field ? h("a", { onclick: () => focusField(x.field) }, x.text) : x.text))))
+      : h("div", { class: "box ok" }, h("h3", { style: "margin:0" }, "✓ Alles Nötige ist ausgefüllt")),
+    answered.length ? h("details", { class: "answered" },
+      h("summary", {}, `${answered.length} ${answered.length === 1 ? "Frage" : "Fragen"} beantwortet`),
+      h("ul", {}, answered.map((q) => h("li", {}, `${q.question} → ${q.answer}`,
+        q.note ? h("span", { style: "color:var(--red)" }, ` (${q.note})`) : null,
+        last && last.question === q.id ? [" ", h("button", { class: "btn small", onclick: () => undoAnswer(i) }, "Rückgängig")] : null)))) : null,
+    t.length ? h("div", { class: "box hint" }, h("h3", {}, "Tipps"), h("ul", {}, t.map((x) => h("li", {}, x)))) : null);
+}
+
+function renderQuestion(i, q) {
+  const locked = LOCKED.has(i.status);
+  return h("div", {},
+    h("div", { class: "question-text" }, q.question),
+    q.explanation ? h("div", { class: "question-info" }, q.explanation) : null,
+    h("div", { class: "tools" }, (q.options || []).map((opt, idx) => {
+      if (!opt.input) return h("button", { class: "btn small", disabled: locked, onclick: () => answer(i, q, idx, "") }, opt.label);
+      const input = h("input", { type: "text", class: "question-input", placeholder: opt.placeholder || opt.label, disabled: locked,
+        "aria-label": opt.label, onkeydown: (e) => { if (e.key === "Enter") answer(i, q, idx, e.target.value); } });
+      return h("span", { class: "question-value" }, input,
+        h("button", { class: "btn small", disabled: locked, onclick: () => answer(i, q, idx, input.value) }, opt.button || "OK"));
+    })));
+}
+
+async function answer(i, q, option, value) {
+  if (answer.busy) return;
+  const opt = q.options[option];
+  if (opt.input && !String(value).trim()) { toast("Bitte erst einen Wert eintragen."); return; }
+  answer.busy = true;
+  try {
+    await saveNow();
+    const fresh = await api("/api/answer", { folder: i.folder, question: q.id, option, value });
+    Object.assign(i, fresh); rememberServer(fresh);
+    if (fresh._version) D.version = fresh._version;
+    renderDetail(); renderList(); renderHeader();
+  } catch (e) { toast("Nicht übernommen: " + e.message); }
+  finally { answer.busy = false; }
+}
+
+async function undoAnswer(i) {
+  try {
+    await saveNow();
+    const fresh = await api("/api/answer/undo", { folder: i.folder });
+    Object.assign(i, fresh); rememberServer(fresh);
+    if (fresh._version) D.version = fresh._version;
+    renderDetail(); renderList(); renderHeader();
+  } catch (e) { toast(e.message); }
+}
+
+function focusField(field) {
+  const el = document.querySelector(`#detail [data-field="${field}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.querySelector("input, select, textarea")?.focus({ preventScroll: true });
+}
+
+function renderPhotos(i, locked) {
+  const chosen = i.photos || [];
+  const unused = (i._all_photos || []).filter((f) => !chosen.includes(f));
+  const setPhotos = (next) => { i.photos = next; save({ photos: next }, true); renderDetail(); renderList(); };
+  const card = (file, idx, off) => h("div", { class: "photo" + (off ? " off" : "") },
+    h("img", { src: imageUrl(i, file, 360), alt: file, loading: "lazy", title: file, onclick: () => showImage(i, file) }),
+    !off && idx === 0 ? h("span", { class: "cover" }, "Titelbild") : null,
+    locked ? null : h("div", { class: "controls" }, off
+      ? [h("button", { class: "btn small", onclick: () => setPhotos([...chosen, file]) }, "+ verwenden")]
+      : [h("button", { class: "btn small", disabled: idx === 0, title: "nach vorn", onclick: () => { const n = [...chosen]; [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]; setPhotos(n); } }, "◀"),
+         h("button", { class: "btn small", title: "nicht verwenden", onclick: () => setPhotos(chosen.filter((f) => f !== file)) }, "✕"),
+         h("button", { class: "btn small", disabled: idx === chosen.length - 1, title: "nach hinten", onclick: () => { const n = [...chosen]; [n[idx + 1], n[idx]] = [n[idx], n[idx + 1]]; setPhotos(n); } }, "▶")]));
+  return h("div", { class: "card", "data-field": "photos" },
+    h("h3", {}, "Fotos", h("small", {}, `${chosen.length} ausgewählt · das erste ist das Titelbild · max. 20`)),
+    chosen.length ? h("div", { class: "photos" }, chosen.map((f, idx) => card(f, idx, false))) : h("div", { class: "help" }, "Keine Fotos ausgewählt."),
+    unused.length ? [h("div", { class: "help", style: "margin:12px 0 6px;color:var(--muted);font-size:13px" }, "Nicht verwendet"),
+      h("div", { class: "photos" }, unused.map((f) => card(f, -1, true)))] : null);
+}
+
+function field(i, key, label, opt) {
+  opt = opt || {};
+  const value = i[key] === null || i[key] === undefined ? "" : String(i[key]).replace(opt.number ? "." : /^$/, opt.number ? "," : "");
+  const attrs = { id: "f-" + key, readonly: opt.locked, disabled: opt.locked && opt.choices ? true : null,
+    oninput: (e) => onEdit(key, e.target.value), onblur: () => saveNow().catch(() => {}), onchange: (e) => { onEdit(key, e.target.value); saveNow().catch(() => {}); } };
+  let input;
+  if (opt.choices) {
+    // English value, German label
+    const options = [...opt.choices];
+    if (value && !options.includes(value)) options.unshift(value);
+    input = h("select", attrs, h("option", { value: "" }, "– bitte wählen –"),
+      options.map((o) => h("option", { value: o, selected: o === value }, displayValue(key, o))));
+  } else if (opt.long) {
+    input = h("textarea", attrs); input.value = value;
+  } else {
+    input = h("input", Object.assign(attrs, { type: "text", inputmode: opt.number ? "decimal" : null, placeholder: opt.placeholder || null }));
+    input.value = value;
+  }
+  const counter = opt.counter ? h("span", { id: "count-" + key }, `${value.length} Zeichen`) : null;
+  return h("div", { class: "field" + (opt.wide ? " wide" : ""), "data-field": key },
+    h("label", { class: "label", for: "f-" + key }, label,
+      h("span", { class: "right" }, counter, opt.copy === false ? null
+        : h("button", { class: "btn small", type: "button", title: "in die Zwischenablage", onclick: () => copyText(document.getElementById("f-" + key).value, label) }, "Kopieren"))),
+    input,
+    opt.help ? h("div", { class: "help" }, opt.help) : null);
+}
+
+function renderFields(i, locked) {
+  const g = { locked };
+  return h("div", { class: "card" }, h("h3", {}, "Inserat"),
+    h("div", { class: "grid" },
+      field(i, "title", "Titel", Object.assign({ wide: true, counter: true }, g)),
+      field(i, "description", "Beschreibung", Object.assign({ wide: true, long: true, counter: true }, g)),
+      field(i, "category", "Kategorie", Object.assign({ wide: true, placeholder: "z. B. Women > Shoes > Boots > Ankle boots", help: "So wie die Kategorien bei Vinted heißen, Ebenen mit > trennen" }, g)),
+      field(i, "brand", "Marke", Object.assign({ placeholder: "z. B. Levi's – ohne Marke: No brand" }, g)),
+      field(i, "size", "Größe (EU)", Object.assign({ placeholder: "z. B. 39" }, g)),
+      field(i, "condition", "Zustand", Object.assign({ choices: D.conditions, copy: false }, g)),
+      field(i, "color", "Farbe", g),
+      field(i, "material", "Material", Object.assign({ help: "optional" }, g)),
+      field(i, "shape", "Schuhform", Object.assign({ placeholder: "z. B. Chelsea Boot, runde Spitze, Blockabsatz", help: "optional" }, g)),
+      field(i, "heel_height", "Absatzhöhe", Object.assign({ placeholder: "z. B. ca. 6 cm", help: "optional, aus dem Foto geschätzt, am besten nachmessen" }, g)),
+      field(i, "package", "Paketgröße", Object.assign({ choices: D.packages, copy: false }, g)),
+      field(i, "price", "Preis (€)", Object.assign({ number: true, help: priceHelp(i) }, g)),
+      field(i, "min_price", "Mindestpreis (€), nur für dich", Object.assign({ number: true, copy: false, help: "Angebote darunter ablehnen" }, g)),
+      field(i, "notes", "Notiz, nur für dich", { wide: true, copy: false })));
+}
+
+const euro = (v) => (v === null || v === undefined || v === "") ? "–" : `${String(v).replace(".", ",")} €`;
+
+function setPrice(i, value, redraw) {
+  i.price = value;
+  save({ price: value }, true, i.folder);
+  if (redraw) redraw();
+}
+
+function priceChoices(i, redraw) {
+  const vp = i.vinted_price || {};
+  const button = (value, text) => value ? h("button", { class: "btn small", title: "als Preis übernehmen",
+    onclick: () => setPrice(i, value, redraw) }, text) : null;
+  return [button(i.suggested_price, `Vorschlag ${euro(i.suggested_price)}`),
+          button(vp.bargain, `${euro(vp.bargain)} günstig`), button(vp.optimal, `${euro(vp.optimal)} optimal`),
+          button(vp.premium, `${euro(vp.premium)} premium`)];
+}
+
+function priceHelp(i) {
+  const vp = i.vinted_price;
+  const locked = LOCKED.has(i.status);
+  return [
+    locked ? null : h("div", { class: "tools", style: "margin:2px 0 4px" }, priceChoices(i, renderDetail)),
+    vp ? h("div", {}, h("strong", {}, "Vinted empfiehlt: "),
+      `${euro(vp.bargain)} günstig · ${euro(vp.optimal)} optimal · ${euro(vp.premium)} premium`,
+      vp.date ? ` (ausgelesen am ${vp.date})` : "")
+       : h("div", {}, "Vinted-Empfehlung noch nicht abgefragt (Ansicht „Preise“ → „Vinted-Preise abfragen“)."),
+    i.price_reasoning ? h("div", {}, h("strong", {}, "Recherche: "), i.price_reasoning) : null,
+  ];
+}
+
+function renderPrices() {
+  const area = document.getElementById("table-view");
+  const list = D.listings.filter((i) => i.status !== "sold");
+  const withPrice = list.filter((i) => num(i.price) > 0);
+  const total = (get) => list.reduce((sum, i) => sum + (num(get(i)) || 0), 0);
+  const numberField = (i, key) => {
+    const locked = LOCKED.has(i.status);
+    const el = h("input", { type: "text", inputmode: "decimal", readonly: locked, "aria-label": FIELD_NAME[key],
+      class: key === "price" && !(num(i.price) > 0) ? "empty" : null,
+      placeholder: key === "price" ? "Preis" : "optional",
+      oninput: (e) => {
+        const w = e.target.value;
+        i[key] = w;
+        e.target.classList.toggle("empty", key === "price" && !(num(w) > 0));
+        if (!w.trim() || Number.isFinite(num(w))) save({ [key]: w }, false, i.folder);
+      },
+      onblur: () => saveNow().catch(() => {}) });
+    el.value = i[key] === null || i[key] === undefined ? "" : String(i[key]).replace(".", ",");
+    return el;
+  };
+  const vpText = (i) => i.vinted_price
+    ? `${euro(i.vinted_price.bargain)} / ${euro(i.vinted_price.optimal)} / ${euro(i.vinted_price.premium)}`
+    : h("span", { class: "small" }, "noch nicht abgefragt");
+  setChildren(area,
+    h("div", { class: "view-header" },
+      h("div", { class: "text" }, "Hier legst du die Preise fest. Ein Klick auf einen Vorschlag übernimmt ihn, oder du tippst selbst. ",
+        "„Vorschlag“ stammt aus der Recherche, die drei Vinted-Werte (günstig / optimal / premium) aus Vinteds eigener Empfehlung."),
+      h("button", { class: "btn", onclick: () => startJob("prices"),
+        title: "Füllt im Vinted-Chrome nur Kategorie, Marke, Größe und Zustand aus, liest die Empfehlung und schließt den Tab ohne zu speichern" },
+        "Vinted-Preise abfragen")),
+    h("div", { class: "table-frame" }, h("table", { class: "table" },
+      h("thead", {}, h("tr", {}, ["", "Inserat", "Status", "Vinted", "Übernehmen", "Preis €", "Mindestpreis €"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, list.map((i) => h("tr", {},
+        h("td", {}, (i.photos || [])[0] ? h("img", { src: imageUrl(i, i.photos[0], 360), alt: "", loading: "lazy" }) : null),
+        h("td", {}, h("div", { class: "title-link", onclick: () => showView("listings", i.folder) }, i.title || i.folder),
+          h("div", { class: "small" }, [displayValue("brand", i.brand), !EMPTY.test(i.size ?? "") && `Gr. ${i.size}`, displayValue("condition", i.condition)].filter((x) => x && !EMPTY.test(x)).join(" · "))),
+        h("td", {}, h("span", { class: `pill s-${i.status}` }, STATUS_LABEL[i.status] || i.status)),
+        h("td", { style: "white-space:nowrap" }, vpText(i)),
+        h("td", {}, LOCKED.has(i.status) ? null : h("div", { class: "choices" }, priceChoices(i, renderPrices))),
+        h("td", {}, numberField(i, "price")),
+        h("td", {}, numberField(i, "min_price"))))),
+      h("tfoot", {}, h("tr", {},
+        h("td", {}), h("td", {}, `${withPrice.length} von ${list.length} mit Preis`), h("td", {}), h("td", {}), h("td", {}),
+        h("td", {}, euro(Math.round(total((i) => i.price) * 100) / 100)),
+        h("td", {}, euro(Math.round(total((i) => i.min_price) * 100) / 100)))))));
+}
+
+function renderAnalysis(i) {
+  const a = i.analysis;
+  if (!a) return null;
+  const row = (name, value) => value && (Array.isArray(value) ? value.length : String(value).trim())
+    ? h("div", { style: "margin:8px 0" }, h("strong", {}, name + ": "),
+        Array.isArray(value) ? h("ul", { style: "margin:4px 0;padding-left:20px" }, value.map((w) => h("li", {}, w))) : String(value))
+    : null;
+  return h("details", { class: "card" },
+    h("summary", { style: "cursor:pointer;font-weight:600" }, "Woran wurde das erkannt? (Foto-Analyse)"),
+    h("div", { style: "font-size:13.5px;color:var(--muted);margin-top:8px" },
+      row("Modell", a.model), row("Marke", a.brand_evidence), row("Größe", a.size_evidence),
+      row("Zustand", a.condition_reasoning), row("Mängel", a.flaws), row("Absatz/Form", a.shape_evidence),
+      row("Preisquellen", a.price_sources)));
+}
+
+function renderActions() {
+  const bar = document.getElementById("actions");
+  const i = byFolder(current);
+  if (!i) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const f = missingItems(i);
+  const button = (text, status, primary, extra) => h("button", Object.assign({ class: "btn" + (primary ? " primary" : ""),
+    onclick: () => setStatus(status) }, extra || {}), text);
+  const parts = [];
+  if (i.status === "new" || i.status === "on_hold") {
+    parts.push(h("div", { class: "text" }, f.length ? `Noch ${f.length} ${f.length === 1 ? "Angabe fehlt" : "Angaben fehlen"}, siehe oben.` : "Bereit. Nach der Freigabe kann das Inserat hochgeladen werden."));
+    parts.push(i.status === "new" ? button("Zurückstellen", "on_hold") : button("Wieder prüfen", "new"));
+    parts.push(button("Freigeben ✓", "approved", true, { disabled: f.length > 0, title: f.length ? "Erst die fehlenden Angaben ergänzen" : null }));
+  } else if (i.status === "approved") {
+    const running = LIVE.job && LIVE.job.running;
+    parts.push(h("div", { class: "text" }, "Freigegeben. „In Vinted ausfüllen“ füllt das Formular im Vinted-Chrome aus, absenden machst du dort selbst.",
+      h("div", { class: "tools" },
+        h("button", { class: "btn small", onclick: preparePhotos }, "Von Hand: Fotos bereitstellen"),
+        h("a", { class: "btn small", href: D.domain + "/items/new", target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Vinted-Formular öffnen ↗"))));
+    parts.push(button("Freigabe zurücknehmen", "new"));
+    parts.push(h("button", { class: "btn primary", disabled: running || !LIVE.chrome,
+      title: !LIVE.chrome ? "Erst oben den Vinted-Chrome öffnen" : (running ? "Es läuft schon ein Auftrag" : null),
+      onclick: () => startJob("fill", i.folder) }, "In Vinted ausfüllen"));
+  } else if (i.status === "draft") {
+    parts.push(h("div", { class: "text" }, "Bei Vinted angelegt (als Entwurf oder schon hochgeladen). Dort prüfen, dann hier den Status setzen.",
+      i.vinted_url ? h("div", { class: "tools" }, h("a", { class: "btn small", href: i.vinted_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Bei Vinted ansehen ↗")) : null));
+    parts.push(button("Zurück auf freigegeben", "approved"));
+    parts.push(button("Ist online ✓", "online", true));
+  } else if (i.status === "online") {
+    const st = i.vinted_stats;
+    parts.push(h("div", { class: "text" }, "Online bei Vinted.",
+      st ? [" ", h("b", {}, `${st.views} Aufrufe`), delta(st.views, st.views_before), " · ", h("b", {}, `${st.favorites} Favoriten`),
+            delta(st.favorites, st.favorites_before), ` (Stand ${timeText(st.time)})`] : " Noch keine Statistik abgerufen.",
+      i.vinted_url ? h("div", { class: "tools" }, h("a", { class: "btn small", href: i.vinted_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Bei Vinted ansehen ↗")) : null));
+    parts.push(button("Zurück auf freigegeben", "approved"));
+    parts.push(button("Verkauft ✓", "sold", true));
+  } else if (i.status === "sold") {
+    parts.push(h("div", { class: "text" }, "Verkauft 🎉"));
+    parts.push(button("Doch nicht verkauft", "online"));
+  }
+  bar.replaceChildren(...parts);
+}
+
+/* ---------- Editing & saving ---------- */
+
+function onEdit(key, value) {
+  const i = byFolder(current);
+  if (!i || i[key] === value) return;
+  i[key] = value;
+  const c = document.getElementById("count-" + key);
+  if (c) c.textContent = `${value.length} Zeichen`;
+  if (key === "title") document.getElementById("header-title").textContent = value || "(noch kein Titel)";
+  // Do not send invalid numbers (they would block saving the other fields)
+  const isNumber = key === "price" || key === "min_price";
+  if (!isNumber || !String(value).trim() || Number.isFinite(num(value))) save({ [key]: value });
+  renderMissing(); renderActions();
+  if (key === "title" || key === "price") renderList(); else updateBadge(i);
+}
+
+function updateBadge(i) {
+  const el = document.querySelector(`.item[data-folder="${CSS.escape(i.folder)}"] .badge-missing, .item[data-folder="${CSS.escape(i.folder)}"] .badge-ok`);
+  if (!el) return;
+  const n = missingItems(i).length;
+  el.className = n ? "badge-missing" : "badge-ok";
+  el.textContent = n ? `${n} fehlt` : "vollständig";
+}
+
+function showSaveState(text, error) {
+  const el = document.getElementById("save-state");
+  if (el) { el.textContent = text; el.classList.toggle("error", !!error); }
+}
+
+function save(changes, immediate, folder) {
+  const target = folder || current;
+  if (pending.folder && pending.folder !== target) saveNow().catch(() => {});
+  pending.folder = target;
+  pending.fields = Object.assign(pending.fields || {}, changes);
+  showSaveState("Ungespeichert …");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveNow().catch(() => {}), immediate ? 0 : 700);
+}
+
+// Saves run one after another so an older state never overtakes a newer one.
+function saveNow() {
+  clearTimeout(saveTimer);
+  if (pending.fields && pending.folder) {
+    const batch = { folder: pending.folder, changes: pending.fields };
+    pending = {};
+    showSaveState("Speichert …");
+    saveChain = saveChain.catch(() => {}).then(() => send(batch));
+  }
+  return saveChain;
+}
+
+// Sends changes together with the base state the page started from. If someone else changed the field
+// in the meantime, the server rejects it (409) and the page shows both versions.
+async function send(batch) {
+  const base = {};
+  const old = SERVER_STATE[batch.folder] || {};
+  for (const k of Object.keys(batch.changes)) if (k in old) base[k] = old[k];
+  try {
+    const fresh = await api("/api/listing", Object.assign({ base }, batch));
+    applyServerState(fresh, Object.keys(batch.changes));
+    if (batch.folder === current && !pending.fields) showSaveState("Gespeichert ✓");
+    if (view === "prices") renderHeader();
+  } catch (e) {
+    if (e.status === 409 && e.data && e.data.listing) {
+      const rejected = {};
+      for (const k of e.data.conflicts || []) rejected[k] = batch.changes[k];
+      CONFLICTS[batch.folder] = Object.assign(CONFLICTS[batch.folder] || {}, rejected);
+      const i = byFolder(batch.folder);
+      if (i) Object.assign(i, e.data.listing);
+      rememberServer(e.data.listing);
+      if (batch.folder === current) { renderDetail(); renderList(); }
+      showSaveState("Konflikt, siehe oben", true);  // after re-render, which rebuilds the save-state element
+      return;
+    }
+    pending = { folder: batch.folder, fields: Object.assign(batch.changes, pending.fields || {}) };
+    showSaveState("Nicht gespeichert!", true);
+    toast("Speichern fehlgeschlagen: " + e.message);
+    throw e;
+  }
+}
+
+function applyServerState(fresh, fields) {
+  const i = byFolder(fresh.folder);
+  if (i) for (const k of ["status", "updated_at", "photos", "_folder_missing", "_all_photos", "_missing_photos"]) i[k] = fresh[k];
+  const server = SERVER_STATE[fresh.folder] || (SERVER_STATE[fresh.folder] = {});
+  for (const k of fields.concat(["status", "photos"])) server[k] = clone(fresh[k]);
+  if (fresh._version) D.version = fresh._version;
+}
+
+async function setStatus(status) {
+  const i = byFolder(current);
+  if (!i || setStatus.busy) return;
+  if (status === "approved" && missingItems(i).length) { toast("Erst die fehlenden Angaben ergänzen."); return; }
+  setStatus.busy = true;
+  try {
+    await saveNow();
+    const fresh = await api("/api/listing", { folder: i.folder, changes: { status }, base: { status: (SERVER_STATE[i.folder] || {}).status } });
+    applyServerState(fresh, ["status"]);
+  } catch (e) {
+    toast(e.status === 409 ? "Der Status wurde inzwischen woanders geändert. Bitte neu laden." : "Status nicht geändert: " + e.message);
+    return;
+  } finally {
+    setStatus.busy = false;
+  }
+  if (status === "approved") {
+    toast("Freigegeben ✓");
+    const candidates = visibleListings().filter((x) => x.folder !== i.folder && (x.status === "new" || x.status === "on_hold"));
+    const next = candidates.find((x) => x.folder > i.folder) || candidates[0];
+    if (next) current = next.folder;
+    window.scrollTo({ top: 0 });
+  }
+  renderAll();
+}
+
+async function preparePhotos() {
+  const i = byFolder(current);
+  if (!i || photosBusy) return;
+  photosBusy = true;
+  toast("Fotos werden vorbereitet …");
+  try {
+    await saveNow();
+    const r = await api("/api/photos/prepare", { folder: i.folder });
+    toast(`${r.count} Fotos liegen als 01.jpg, 02.jpg … im geöffneten Ordner, ohne GPS-Daten. Einfach zu Vinted ziehen.`);
+  } catch (e) { toast("Fehler: " + e.message); }
+  finally { photosBusy = false; }
+}
+
+async function copyText(text, label) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  toast(`${label} kopiert`);
+}
+
+/* ---------- Images & keyboard ---------- */
+
+function showImage(i, file) {
+  const lb = document.getElementById("lightbox");
+  const all = [...(i.photos || []), ...(i._all_photos || []).filter((f) => !(i.photos || []).includes(f))];
+  lightboxIndex = all.indexOf(file);
+  lb.dataset.folder = i.folder;
+  lb.querySelector("img").src = imageUrl(i, file, 1600);
+  lb.hidden = false;
+}
+
+function stepImage(step) {
+  const lb = document.getElementById("lightbox"); const i = byFolder(lb.dataset.folder);
+  if (!i) return;
+  const all = [...(i.photos || []), ...(i._all_photos || []).filter((f) => !(i.photos || []).includes(f))];
+  lightboxIndex = (lightboxIndex + step + all.length) % all.length;
+  lb.querySelector("img").src = imageUrl(i, all[lightboxIndex], 1600);
+}
+
+document.getElementById("lightbox").addEventListener("click", (e) => (e.currentTarget.hidden = true));
+document.getElementById("reload").addEventListener("click", () => load().then((ok) => ok && toast("Neu geladen")));
+window.addEventListener("focus", checkVersion);
+document.addEventListener("visibilitychange", checkVersion);
+new ResizeObserver(() => document.documentElement.style.setProperty("--header-h", document.querySelector(".header").offsetHeight + "px"))
+  .observe(document.querySelector(".header"));
+
+document.addEventListener("keydown", (e) => {
+  const lb = document.getElementById("lightbox");
+  if (!lb.hidden) {
+    if (e.key === "Escape") lb.hidden = true;
+    if (e.key === "ArrowRight") stepImage(1);
+    if (e.key === "ArrowLeft") stepImage(-1);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    const i = byFolder(current);
+    const visible = getComputedStyle(document.getElementById("detail")).display !== "none";
+    if (!e.repeat && i && visible && (i.status === "new" || i.status === "on_hold")) setStatus("approved");
+    return;
+  }
+  if (e.target.closest("input, textarea, select")) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    const list = visibleListings(); const idx = list.findIndex((i) => i.folder === current);
+    const n = list[idx + (e.key === "ArrowDown" ? 1 : -1)];
+    if (n) { e.preventDefault(); selectListing(n.folder); }
+  }
+});
+
+window.addEventListener("beforeunload", (e) => { if (pending.fields) { saveNow().catch(() => {}); e.preventDefault(); e.returnValue = ""; } });
+
+if (location.protocol === "file:") {
+  document.getElementById("detail").replaceChildren(h("div", { class: "box missing" },
+    h("h3", {}, "Bitte nicht als Datei öffnen"),
+    "Diese Seite braucht den kleinen lokalen Server. Starte ihn per Doppelklick auf „Start Hub.bat“ im Projektordner ",
+    "(oder: python -m vinted_hub serve). Dann öffnet sich die Seite unter http://127.0.0.1:8765 von selbst."));
+} else {
+  load().then(() => pollStatus());
+}
+</script>
+</body>
+</html>

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "freigabe",
+      "name": "hub",
       "runtimeExecutable": ".venv\\Scripts\\python.exe",
-      "runtimeArgs": ["-u", "vinted.py", "freigabe", "--kein-browser"],
+      "runtimeArgs": ["-u", "-m", "vinted_hub", "serve", "--no-browser"],
       "port": 8765
     }
   ]
