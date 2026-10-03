@@ -1,0 +1,24 @@
+# Persönliche Daten – gehören nicht ins Repo
+0_input_foto/
+schuhe/
+analyse/
+_archiv/
+erkunden/
+browser-profil/
+inserate.json
+inserate.json.bak
+inserate.*.tmp
+inserate.lock
+statistik.json
+statistik.*.tmp
+
+# Python / Umgebung
+.venv/
+__pycache__/
+*.pyc
+
+# Sonstiges
+*.tmp
+Thumbs.db
+desktop.ini
+.DS_Store

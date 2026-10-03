@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vinted Zentrale</title>
+<style>
+:root {
+  --bg: #f4f5f6; --panel: #ffffff; --text: #1c2226; --muted: #67727b; --line: #e1e4e7;
+  --accent: #0b7a75; --accent-ink: #ffffff; --accent-soft: #e3f2f1;
+  --rot: #b42318; --rot-soft: #fdecea; --gelb: #8a5a00; --gelb-soft: #fff5dc; --gruen: #157a3a; --gruen-soft: #e5f5ea;
+  --s-neu: #5b6670; --s-zurueckgestellt: #a15c07; --s-freigegeben: #157a3a; --s-entwurf: #1d5fd1; --s-online: #6d3fd1; --s-verkauft: #1c2226;
+  --radius: 10px; --schatten: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101315; --panel: #191d20; --text: #e6e9eb; --muted: #98a2ab; --line: #2a3035;
+    --accent: #2bb3ab; --accent-ink: #06201f; --accent-soft: #11302e;
+    --rot: #ff8a80; --rot-soft: #3a1714; --gelb: #f3c66b; --gelb-soft: #33280f; --gruen: #6fd08f; --gruen-soft: #10301b;
+    --s-neu: #98a2ab; --s-zurueckgestellt: #f0a640; --s-freigegeben: #6fd08f; --s-entwurf: #7aa7ff; --s-online: #b49aff; --s-verkauft: #e6e9eb;
+    --schatten: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.kopf { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.kopf h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+.filter { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip .n { opacity: .7; margin-left: 4px; }
+.knopf { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 14px; cursor: pointer; white-space: nowrap; }
+.knopf:hover:not(:disabled) { border-color: var(--muted); }
+.knopf:disabled { opacity: .45; cursor: not-allowed; }
+.knopf.haupt { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.knopf.klein { padding: 2px 8px; font-size: 12px; border-radius: 6px; }
+.layout { display: grid; grid-template-columns: 330px 1fr; min-height: calc(100% - var(--kopf-h, 58px)); }
+.liste { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; max-height: calc(100vh - var(--kopf-h, 58px)); position: sticky; top: var(--kopf-h, 58px); }
+.eintrag { display: grid; grid-template-columns: 56px 1fr; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+.eintrag:hover { background: var(--bg); }
+.eintrag[aria-current="true"] { background: var(--accent-soft); }
+.eintrag img, .eintrag .ohne-bild { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: var(--line); display: block; }
+.eintrag .t { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eintrag .zeile { display: flex; gap: 6px; align-items: center; margin-top: 3px; flex-wrap: wrap; }
+.pill { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.s-neu { color: var(--s-neu); } .s-zurueckgestellt { color: var(--s-zurueckgestellt); } .s-freigegeben { color: var(--s-freigegeben); }
+.s-entwurf { color: var(--s-entwurf); } .s-online { color: var(--s-online); } .s-verkauft { color: var(--s-verkauft); }
+.badge-fehlt { font-size: 11.5px; color: var(--rot); background: var(--rot-soft); padding: 1px 7px; border-radius: 999px; }
+.badge-ok { font-size: 11.5px; color: var(--gruen); background: var(--gruen-soft); padding: 1px 7px; border-radius: 999px; }
+.leer-liste { padding: 24px 16px; color: var(--muted); }
+.detail { padding: 18px 22px 110px; max-width: 980px; width: 100%; }
+.detail-kopf { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.detail-kopf .titel-block { flex: 1; min-width: 0; }
+.detail-kopf .ordner { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, Consolas, monospace; }
+.detail-kopf h2 { margin: 2px 0 0; font-size: 21px; line-height: 1.25; overflow-wrap: anywhere; }
+.speicher { font-size: 12.5px; color: var(--muted); min-width: 90px; text-align: right; padding-top: 4px; }
+.speicher.fehler { color: var(--rot); }
+.zurueck { display: none; }
+.box { border-radius: var(--radius); padding: 11px 14px; margin-bottom: 12px; }
+.box h3 { margin: 0 0 4px; font-size: 14px; }
+.box ul { margin: 0; padding-left: 20px; }
+.box li { margin: 2px 0; }
+.box.fehlt { background: var(--rot-soft); color: var(--rot); }
+.box.fehlt a { color: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.box ul.fragen { list-style: none; padding-left: 0; }
+.box ul.fragen > li { margin: 0; padding: 8px 0; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.box ul.fragen > li:first-child { border-top: 0; padding-top: 2px; }
+.frage-text { font-weight: 600; }
+.frage-info { font-size: 12.5px; opacity: .85; margin-top: 2px; }
+.box.fehlt .knopf { color: var(--text); }
+.frage-wert { display: inline-flex; gap: 4px; align-items: center; }
+.frage-eingabe { width: 120px; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 3px 7px; font-size: 13px; }
+.beantwortet { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+.beantwortet summary { cursor: pointer; }
+.beantwortet ul { margin: 6px 0 0; padding-left: 20px; }
+.box.ok { background: var(--gruen-soft); color: var(--gruen); }
+.box.hinweis { background: var(--gelb-soft); color: var(--gelb); }
+.box.info { background: var(--accent-soft); }
+.karte { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--schatten); }
+.karte > h3 { margin: 0 0 10px; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
+.karte > h3 small { color: var(--muted); font-weight: 400; }
+.fotos { display: flex; gap: 10px; flex-wrap: wrap; }
+.foto { position: relative; width: 132px; }
+.foto img { width: 132px; height: 132px; object-fit: cover; border-radius: 8px; display: block; cursor: zoom-in; background: var(--line); }
+.foto .titelbild { position: absolute; top: 6px; left: 6px; background: var(--accent); color: var(--accent-ink); font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.foto .steuer { display: flex; justify-content: space-between; margin-top: 4px; }
+.foto.aus img { opacity: .45; filter: grayscale(.6); }
+.raster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.feld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.feld.breit { grid-column: 1 / -1; }
+.feld .label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.feld .label .rechts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.feld input, .feld select, .feld textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.feld textarea { min-height: 170px; resize: vertical; }
+.feld input:focus, .feld select:focus, .feld textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.feld.ist-fehlt input, .feld.ist-fehlt select, .feld.ist-fehlt textarea { border-color: var(--rot); background: var(--rot-soft); }
+.feld .hilfe { font-size: 12.5px; color: var(--muted); }
+.feld .hilfe div + div { margin-top: 3px; }
+.karte.ist-fehlt { border-color: var(--rot); }
+.feld input[readonly], .feld textarea[readonly] { opacity: .75; }
+.aktionen { position: fixed; bottom: 0; left: 330px; right: 0; z-index: 4; background: var(--panel); border-top: 1px solid var(--line);
+  padding: 10px 22px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.aktionen .text { flex: 1; color: var(--muted); font-size: 13.5px; min-width: 200px; }
+.werkzeuge { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 20; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.lightbox[hidden] { display: none; }
+.lightbox img { max-width: 96vw; max-height: 94vh; border-radius: 6px; }
+.toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--panel); padding: 9px 16px; border-radius: 8px; z-index: 30; font-size: 14px; max-width: 90vw; }
+.toast[hidden] { display: none; }
+.tasten { color: var(--muted); font-size: 12px; margin-top: 18px; }
+.ansichten { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+.ansichten button { border: 0; background: transparent; padding: 4px 12px; border-radius: 7px; cursor: pointer; font-size: 13.5px; }
+.ansichten button[aria-pressed="true"] { background: var(--panel); box-shadow: var(--schatten); font-weight: 600; }
+.statistik { color: var(--muted); font-size: 13px; flex: 1; min-width: 200px; }
+.statistik b { color: var(--text); font-weight: 600; }
+.kopf-rechts { display: flex; gap: 10px; align-items: center; margin-left: auto; }
+.chrome-status { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.chrome-status .punkt { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.chrome-status.an .punkt { background: var(--gruen); }
+.kopf .filter { flex-basis: 100%; }
+body.ansicht-preise .layout, body.ansicht-preise .aktionen, body.ansicht-preise .kopf .filter { display: none; }
+.preise { padding: 18px 22px 120px; }
+.preise[hidden] { display: none; }
+.preise-kopf { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.preise-kopf .text { color: var(--muted); font-size: 13.5px; flex: 1; min-width: 240px; }
+.tabelle-rahmen { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.tabelle { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabelle th { text-align: left; font-weight: 600; font-size: 12.5px; color: var(--muted); padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabelle td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tabelle tr:last-child td { border-bottom: 0; }
+.tabelle img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: block; }
+.tabelle .titel-link { cursor: pointer; font-weight: 600; }
+.tabelle .titel-link:hover { text-decoration: underline; }
+.tabelle .klein { color: var(--muted); font-size: 12.5px; }
+.tabelle input { width: 82px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 6px 8px; text-align: right; }
+.tabelle input.leer { border-color: var(--rot); background: var(--rot-soft); }
+.tabelle .wahl { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabelle tfoot td { font-weight: 600; border-top: 1px solid var(--line); }
+/* Diagramme: Aufrufe = blau, Favoriten = orange (geprüft auf Farbsehschwäche, hell + dunkel) */
+:root { --viz-1: #2a78d6; --viz-2: #eb6834; --viz-grid: #e1e0d9; --viz-achse: #c3c2b7; --viz-leise: #898781; --viz-gut: #006300; }
+@media (prefers-color-scheme: dark) {
+  :root { --viz-1: #3987e5; --viz-2: #d95926; --viz-grid: #2c2c2a; --viz-achse: #383835; --viz-leise: #898781; --viz-gut: #0ca30c; }
+}
+.kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kachel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.kachel .label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.kachel .wert { font-size: 30px; font-weight: 600; line-height: 1.15; margin: 2px 0; }
+.kachel .unten { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.kachel .schluessel { width: 10px; height: 2px; border-radius: 1px; display: inline-block; }
+.delta-plus { color: var(--viz-gut); }
+.kennzahl-zeile { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.diagramme { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+@media (max-width: 980px) { .diagramme { grid-template-columns: minmax(0, 1fr); } }
+.diagramm-karte { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; position: relative; min-width: 0; }
+.diagramm-karte h3 { margin: 0 0 2px; font-size: 14.5px; }
+.diagramm-karte .unterzeile { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.diagramm-flaeche { width: 100%; }
+.diagramm-flaeche svg { display: block; overflow: visible; }
+.diagramm-flaeche svg text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--viz-leise); font-variant-numeric: tabular-nums; }
+.diagramm-flaeche svg text.beschriftung { fill: var(--muted); font-size: 12px; font-variant-numeric: normal; }
+.diagramm-flaeche svg text.wertmarke { fill: var(--text); font-weight: 600; }
+.diagramm-flaeche .balken { transition: opacity .12s; }
+.diagramm-flaeche .zeile-aktiv .balken { opacity: .78; }
+.viz-tip { position: absolute; pointer-events: none; z-index: 6; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.14); padding: 7px 10px; font-size: 12.5px; max-width: 280px; }
+.viz-tip[hidden] { display: none; }
+.viz-tip .zeile { display: flex; gap: 7px; align-items: center; }
+.viz-tip .zeile b { font-size: 13.5px; }
+.viz-tip .klein { color: var(--muted); }
+.diagramm-karte details { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.diagramm-karte details table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.diagramm-karte details td, .diagramm-karte details th { padding: 3px 12px 3px 0; text-align: left; }
+.auftrag { position: fixed; right: 16px; bottom: 76px; width: min(460px, calc(100vw - 32px)); z-index: 15; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; }
+.auftrag[hidden] { display: none; }
+.auftrag h3 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.auftrag pre { margin: 0 0 8px; max-height: 190px; overflow-y: auto; font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--muted); }
+kbd { font: 11px ui-monospace, Consolas, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+@media (max-width: 820px) {
+  .layout { grid-template-columns: 1fr; }
+  .liste { position: static; max-height: none; border-right: 0; }
+  .aktionen { left: 0; padding: 10px 16px; }
+  .detail { padding: 14px 16px 130px; }
+  .raster { grid-template-columns: 1fr; }
+  body.mobil-detail .liste { display: none; }
+  body:not(.mobil-detail) .detail, body:not(.mobil-detail) .aktionen { display: none; }
+  .zurueck { display: inline-block; }
+  .foto, .foto img { width: 104px; } .foto img { height: 104px; }
+}
+</style>
+</head>
+<body>
+<header class="kopf">
+  <h1>Vinted Zentrale</h1>
+  <nav id="ansichten" class="ansichten" aria-label="Ansicht"></nav>
+  <div id="statistik" class="statistik"></div>
+  <div class="kopf-rechts">
+    <span id="chrome-status" class="chrome-status"></span>
+    <button id="neu-laden" class="knopf" title="inserate.json und Foto-Ordner neu einlesen">Neu laden</button>
+  </div>
+  <nav id="filter" class="filter" aria-label="Filter"></nav>
+</header>
+<main class="layout">
+  <aside id="liste" class="liste" aria-label="Inserate"></aside>
+  <section id="detail" class="detail"></section>
+</main>
+<section id="preise" class="preise" hidden></section>
+<div id="aktionen" class="aktionen" hidden></div>
+<div id="auftrag" class="auftrag" hidden></div>
+<div id="lightbox" class="lightbox" hidden><img alt=""></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+const STATUS_TEXT = { neu: "Zu prüfen", zurueckgestellt: "Zurückgestellt", freigegeben: "Freigegeben",
+  entwurf: "Entwurf bei Vinted", online: "Online", verkauft: "Verkauft" };
+const FILTER = [["alle", "Alle"], ["neu", "Zu prüfen"], ["zurueckgestellt", "Zurückgestellt"], ["freigegeben", "Freigegeben"],
+  ["entwurf", "Entwurf"], ["online", "Online"], ["verkauft", "Verkauft"]];
+const GESPERRT = new Set(["entwurf", "online", "verkauft"]);
+const PFLICHT = [["titel", "Titel"], ["beschreibung", "Beschreibung"], ["kategorie", "Kategorie"],
+  ["marke", "Marke (oder „Ohne Marke“)"], ["groesse", "Größe"], ["zustand", "Zustand"], ["paket", "Paketgröße"]];
+const LEER = /^\s*(unbekannt|unklar|unknown|unclear|n\/?a|tbd|-|\?|\[\?[^\]]*\])?\s*$/i;
+const PLATZHALTER = /\[\?/;
+const TEXT_PRUEFEN = [["titel", "Titel"], ["beschreibung", "Beschreibung"], ["kategorie", "Kategorie"], ["marke", "Marke"],
+  ["groesse", "Größe"], ["farbe", "Farbe"], ["material", "Material"], ["schuhform", "Schuhform"], ["absatzhoehe", "Absatzhöhe"]];
+const FELDNAME = Object.fromEntries([...TEXT_PRUEFEN, ["zustand", "Zustand"], ["paket", "Paketgröße"], ["preis", "Preis"],
+  ["preis_min", "Mindestpreis"], ["notiz", "Notiz"], ["fotos", "Fotos"], ["status", "Status"]]);
+
+let D = null;            // Antwort von /api/daten
+let aktuell = null;      // ordner des gewählten Inserats
+let filter = merke("filter") || "alle";
+let offen = {};          // noch nicht gespeicherte Änderungen {ordner, felder}
+let speicherTimer = null;
+let speicherKette = Promise.resolve();
+let SERVER = {};         // ordner -> Werte, wie der Server sie zuletzt geliefert hat (Basis gegen Überschreiben)
+let KONFLIKT = {};       // ordner -> {feld: deine nicht gespeicherte Eingabe}
+let fotosLaeuft = false;
+let lightboxIndex = -1;
+let ansicht = ["preise", "statistik"].includes(merke("ansicht")) ? merke("ansicht") : "inserate";
+let STAT = null;                               // aus /api/statistik (Verlauf der Abrufe)
+let LAGE = { chrome: false, auftrag: null };   // aus /api/status
+let auftragZu = false;                         // Auftragsfenster nach Ende weggeklickt
+const zahl = (v) => Number(String(v ?? "").replace(/[€\s]/g, "").replace(/[.,]-$/, "").replace(",", "."));
+const kopie = (x) => JSON.parse(JSON.stringify(x ?? null));
+const merkeServer = (i) => { SERVER[i.ordner] = kopie(i); };
+
+function merke(k, v) {
+  try { if (v === undefined) return localStorage.getItem("vf_" + k); localStorage.setItem("vf_" + k, v); } catch (e) { return null; }
+}
+
+function h(tag, attrs, ...kinder) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (v === true) el.setAttribute(k, "");
+    else el.setAttribute(k, v);
+  }
+  for (const kind of kinder.flat()) {
+    if (kind === null || kind === undefined || kind === false) continue;
+    el.append(kind instanceof Node ? kind : document.createTextNode(String(kind)));
+  }
+  return el;
+}
+
+function fuelle(el, ...kinder) {
+  el.replaceChildren(...kinder.flat().filter((k) => k !== null && k !== undefined && k !== false));
+}
+
+async function api(pfad, body) {
+  const r = await fetch(pfad, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const fehler = new Error(d.fehler || r.statusText);
+    fehler.status = r.status; fehler.daten = d;
+    throw fehler;
+  }
+  return d;
+}
+
+function toast(text) {
+  const t = document.getElementById("toast");
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.hidden = true), 3200);
+}
+
+const finde = (ordner) => D.inserate.find((i) => i.ordner === ordner);
+const sichtbare = () => D.inserate.filter((i) => filter === "alle" || i.status === filter);
+const bildUrl = (i, datei, w) => `/bild/${encodeURIComponent(i.ordner)}/${encodeURIComponent(datei)}?w=${w}`;
+
+const offeneFragen = (i) => (i.fragen || []).filter((q) => !q.antwort);
+
+function fehlt(i) {
+  const f = [];
+  const fragen = offeneFragen(i);
+  const perFrage = new Set(fragen.map((q) => q.feld).filter(Boolean));
+  if (i._ordner_fehlt) f.push({ feld: null, text: "Foto-Ordner existiert nicht mehr" });
+  for (const q of fragen) f.push({ feld: q.feld || null, frage: q });
+  if (!(i.fotos || []).length) f.push({ feld: "fotos", text: "Mindestens ein Foto auswählen" });
+  for (const [k, name] of PFLICHT) if (!perFrage.has(k) && LEER.test(i[k] ?? "")) f.push({ feld: k, text: `${name} fehlt` });
+  // Platzhalter, zu denen es (keine offene) Frage gibt, müssen von Hand weg
+  if (!fragen.length) for (const [k, name] of TEXT_PRUEFEN)
+    if (!LEER.test(i[k] ?? "") && PLATZHALTER.test(i[k] || "")) f.push({ feld: k, text: `${name}: Platzhalter [? …] ersetzen oder löschen` });
+  const preis = zahl(i.preis);
+  if (String(i.preis ?? "").trim() && !Number.isFinite(preis)) f.push({ feld: "preis", text: "Preis ist keine gültige Zahl" });
+  else if (!(preis > 0)) f.push({ feld: "preis", text: "Preis fehlt" });
+  return f;
+}
+
+function tipps(i) {
+  const t = [];
+  const n = (i.fotos || []).length;
+  if (n > 0 && n < 3) t.push("Weniger als 3 Fotos: Käufer wollen Seite, Sohle und Größenetikett sehen.");
+  if (n > 20) t.push(`Vinted nimmt höchstens 20 Fotos, die letzten ${n - 20} werden beim Hochladen weggelassen.`);
+  if ((i._fotos_fehlen || []).length) t.push("Nicht mehr im Ordner: " + i._fotos_fehlen.join(", "));
+  if (LEER.test(i.farbe ?? "")) t.push("Farbe ist leer (optional, hilft aber bei der Suche).");
+  if ((i.titel || "").length > 60) t.push("Titel ist lang: das Wichtigste (Marke, Typ, Größe) nach vorn.");
+  if (zahl(i.preis_min) > 0 && zahl(i.preis) > 0 && zahl(i.preis_min) > zahl(i.preis)) t.push("Mindestpreis liegt über dem Preis.");
+  const vp = i.vinted_preis;
+  if (vp && vp.premium && zahl(i.preis) > vp.premium * 1.3)
+    t.push(`Dein Preis liegt deutlich über Vinteds Empfehlung (optimal ${vp.optimal} €, premium ${vp.premium} €). Das kann den Verkauf bremsen.`);
+  return t;
+}
+
+/* ---------- Laden & Rendern ---------- */
+
+async function laden() {
+  try { await speichernJetzt(); } catch (e) { return false; }
+  try {
+    D = await api("/api/daten");
+  } catch (e) {
+    document.getElementById("detail").replaceChildren(h("div", { class: "box fehlt" }, "Daten konnten nicht geladen werden: " + e.message));
+    return false;
+  }
+  SERVER = {};
+  D.inserate.forEach(merkeServer);
+  if (!aktuell || !finde(aktuell)) aktuell = (sichtbare()[0] || D.inserate[0] || {}).ordner || null;
+  renderAlles();
+  return true;
+}
+
+// Hat jemand anderes (z. B. Claude) inserate.json geändert? Dann beim Zurückkehren neu laden.
+async function pruefeVersion() {
+  if (!D || document.hidden || offen.felder) return;
+  try {
+    const { version } = await api("/api/version");
+    if (version !== D.version) {
+      await speicherKette.catch(() => {});
+      if (!offen.felder && await laden()) toast("Die Inserate wurden inzwischen geändert und neu geladen.");
+    }
+  } catch (e) { /* Server kurz nicht erreichbar */ }
+}
+
+function renderAlles() {
+  const tabelle = ansicht === "preise" || ansicht === "statistik";
+  document.body.classList.toggle("ansicht-preise", tabelle);
+  document.getElementById("preise").hidden = !tabelle;
+  renderKopf();
+  if (ansicht === "preise") renderPreise();
+  else if (ansicht === "statistik") renderStatistik();
+  else { renderFilter(); renderListe(); renderDetail(); }
+}
+
+async function ladeStatistik() {
+  try { STAT = await api("/api/statistik"); } catch (e) { STAT = { verlauf: [] }; toast("Statistik nicht ladbar: " + e.message); }
+  if (ansicht === "statistik") renderStatistik();
+}
+
+const VSTATUS = (a) => a.verkauft ? "Verkauft" : a.reserviert ? "Reserviert" : a.entwurf ? "Entwurf" : a.versteckt ? "Versteckt" : "Online";
+const zeitText = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–";
+const plus = (neu, alt) => (alt === undefined || alt === null || neu === alt) ? null
+  : h("span", { class: neu > alt ? "badge-ok" : "badge-fehlt", style: "margin-left:6px" }, `${neu > alt ? "+" : ""}${neu - alt}`);
+
+/* ---------- Diagramme (reines SVG, keine externen Bibliotheken) ---------- */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function s(tag, attrs, ...kinder) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v !== null && v !== undefined) el.setAttribute(k, v);
+  for (const kind of kinder.flat()) if (kind !== null && kind !== undefined) el.append(kind instanceof Node ? kind : document.createTextNode(String(kind)));
+  return el;
+}
+const KENNZAHL = { aufrufe: { name: "Aufrufe", farbe: "var(--viz-1)" }, favoriten: { name: "Favoriten", farbe: "var(--viz-2)" } };
+let kennzahl = merke("kennzahl") === "favoriten" ? "favoriten" : "aufrufe";
+const schluessel = (farbe) => h("span", { class: "schluessel", style: `background:${farbe}` });
+
+function schoeneSkala(max) {
+  if (!(max > 0)) return { max: 4, schritt: 1 };
+  const roh = max / 4, p = 10 ** Math.floor(Math.log10(roh)), f = roh / p;
+  const schritt = Math.max(1, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p);
+  return { max: Math.ceil(max / schritt) * schritt, schritt };
+}
+
+let textMesser = null;
+function kuerze(text, breite) {
+  textMesser = textMesser || document.createElement("canvas").getContext("2d");
+  textMesser.font = '12px system-ui, -apple-system, "Segoe UI", sans-serif';
+  if (textMesser.measureText(text).width <= breite) return text;
+  let t = text;
+  while (t.length > 1 && textMesser.measureText(t + "…").width > breite) t = t.slice(0, -1);
+  return t + "…";
+}
+
+function zeigeTip(karte, tip, ereignis, inhalt) {
+  fuelle(tip, inhalt);
+  tip.hidden = false;
+  const r = karte.getBoundingClientRect();
+  let x = ereignis.clientX - r.left + 14, y = ereignis.clientY - r.top + 14;
+  if (x + tip.offsetWidth > r.width - 4) x = ereignis.clientX - r.left - tip.offsetWidth - 14;
+  if (y + tip.offsetHeight > r.height - 4) y = ereignis.clientY - r.top - tip.offsetHeight - 10;
+  tip.style.left = Math.max(4, x) + "px"; tip.style.top = Math.max(4, y) + "px";
+}
+
+// Verlauf einer Summe über alle Abrufe (eine Linie, eine Achse)
+function linienDiagramm(karte, tip, punkte, kz, breite) {
+  const H = 210, oben = 16, unten = 30, links = 34, rechts = 34;
+  const w = Math.max(260, breite), innenB = w - links - rechts, innenH = H - oben - unten;
+  const { max, schritt } = schoeneSkala(Math.max(...punkte.map((p) => p.wert)));
+  const t0 = punkte[0].zeit, t1 = punkte[punkte.length - 1].zeit;
+  const x = (t) => punkte.length === 1 || t1 === t0 ? links + innenB / 2 : links + (t - t0) / (t1 - t0) * innenB;
+  const y = (v) => oben + innenH - (v / max) * innenH;
+  const svg = s("svg", { width: w, height: H, role: "img", "aria-label": `${kz.name} gesamt pro Abruf` });
+  for (let v = 0; v <= max; v += schritt) {
+    svg.append(s("line", { x1: links, x2: w - rechts, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--viz-achse)" : "var(--viz-grid)", "stroke-width": 1 }));
+    svg.append(s("text", { x: links - 7, y: y(v) + 4, "text-anchor": "end" }, v.toLocaleString("de-DE")));
+  }
+  const mehrereTage = t1 - t0 > 2 * 86400000;
+  const datum = (t) => new Date(t).toLocaleString("de-DE", mehrereTage ? { day: "2-digit", month: "2-digit" } : { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const maxTicks = Math.max(1, Math.min(punkte.length, Math.floor(innenB / 90)));
+  const ticks = punkte.length === 1 ? [0] : [...new Set(Array.from({ length: maxTicks }, (_, k) => Math.round(k * (punkte.length - 1) / Math.max(1, maxTicks - 1))))];
+  for (const i of ticks) {
+    const anker = punkte.length === 1 ? "middle" : i === 0 ? "start" : i === punkte.length - 1 ? "end" : "middle";
+    svg.append(s("text", { x: x(punkte[i].zeit), y: H - 9, "text-anchor": anker }, datum(punkte[i].zeit)));
+  }
+  if (punkte.length > 1) {
+    const d = punkte.map((p, i) => `${i ? "L" : "M"}${x(p.zeit).toFixed(1)},${y(p.wert).toFixed(1)}`).join("");
+    svg.append(s("path", { d: `${d}L${x(t1)},${y(0)}L${x(t0)},${y(0)}Z`, fill: kz.farbe, "fill-opacity": 0.1 }));
+    svg.append(s("path", { d, fill: "none", stroke: kz.farbe, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  }
+  const letzter = punkte[punkte.length - 1];
+  svg.append(s("circle", { cx: x(t1), cy: y(letzter.wert), r: 4, fill: kz.farbe, stroke: "var(--panel)", "stroke-width": 2 }));
+  svg.append(s("text", { x: x(t1) + 9, y: y(letzter.wert) + 4, class: "wertmarke" }, letzter.wert.toLocaleString("de-DE")));
+  // Fadenkreuz: rastet auf den nächsten Abruf ein
+  const linie = s("line", { y1: oben, y2: oben + innenH, stroke: "var(--viz-achse)", "stroke-width": 1, visibility: "hidden" });
+  const punkt = s("circle", { r: 4, fill: kz.farbe, stroke: "var(--panel)", "stroke-width": 2, visibility: "hidden" });
+  const flaeche = s("rect", { x: links, y: oben, width: innenB, height: innenH, fill: "transparent" });
+  svg.append(linie, punkt, flaeche);
+  flaeche.addEventListener("pointermove", (e) => {
+    const px = e.clientX - svg.getBoundingClientRect().left;
+    const p = punkte.reduce((a, b) => Math.abs(x(b.zeit) - px) < Math.abs(x(a.zeit) - px) ? b : a);
+    for (const el of [linie]) { el.setAttribute("x1", x(p.zeit)); el.setAttribute("x2", x(p.zeit)); el.setAttribute("visibility", "visible"); }
+    punkt.setAttribute("cx", x(p.zeit)); punkt.setAttribute("cy", y(p.wert)); punkt.setAttribute("visibility", "visible");
+    zeigeTip(karte, tip, e, [h("div", { class: "zeile" }, schluessel(kz.farbe), h("b", {}, p.wert.toLocaleString("de-DE")), kz.name),
+      h("div", { class: "klein" }, zeitText(new Date(p.zeit).toISOString()))]);
+  });
+  flaeche.addEventListener("pointerleave", () => { tip.hidden = true; linie.setAttribute("visibility", "hidden"); punkt.setAttribute("visibility", "hidden"); });
+  return svg;
+}
+
+// Aktueller Wert je Inserat als waagerechte Balken (eine Farbe, sortiert)
+function balkenDiagramm(karte, tip, zeilen, kz, key, breite, davor) {
+  const zeilenH = 28, dicke = 14, oben = 4, unten = 24;
+  const w = Math.max(260, breite), labelB = Math.min(240, Math.round(w * 0.42)), rechts = 34;
+  const innenB = w - labelB - rechts, H = oben + zeilen.length * zeilenH + unten;
+  const { max, schritt } = schoeneSkala(Math.max(...zeilen.map((a) => a[key])));
+  const x = (v) => labelB + (v / max) * innenB;
+  const svg = s("svg", { width: w, height: H, role: "img", "aria-label": `${kz.name} je Inserat` });
+  for (let v = 0; v <= max; v += schritt) {
+    svg.append(s("line", { x1: x(v), x2: x(v), y1: oben, y2: H - unten, stroke: v === 0 ? "var(--viz-achse)" : "var(--viz-grid)", "stroke-width": 1 }));
+    svg.append(s("text", { x: x(v), y: H - 8, "text-anchor": "middle" }, v.toLocaleString("de-DE")));
+  }
+  zeilen.forEach((a, n) => {
+    const yMitte = oben + n * zeilenH + zeilenH / 2, y0 = yMitte - dicke / 2, bw = x(a[key]) - labelB, r = 4;
+    const gruppe = s("g", {});
+    gruppe.append(s("text", { x: labelB - 8, y: yMitte + 4, "text-anchor": "end", class: "beschriftung" }, kuerze(a.titel, labelB - 14)));
+    if (bw >= r) gruppe.append(s("path", { class: "balken", fill: kz.farbe,
+      d: `M${labelB},${y0}h${bw - r}a${r},${r} 0 0 1 ${r},${r}v${dicke - 2 * r}a${r},${r} 0 0 1 ${-r},${r}h${-(bw - r)}Z` }));
+    else if (bw > 0) gruppe.append(s("rect", { class: "balken", x: labelB, y: y0, width: bw, height: dicke, fill: kz.farbe }));
+    gruppe.append(s("text", { x: x(a[key]) + 6, y: yMitte + 4, class: "wertmarke" }, a[key].toLocaleString("de-DE")));
+    const treffer = s("rect", { x: 0, y: yMitte - zeilenH / 2, width: w, height: zeilenH, fill: "transparent" });
+    gruppe.append(treffer);
+    treffer.addEventListener("pointermove", (e) => {
+      gruppe.classList.add("zeile-aktiv");
+      const alt = davor[a.id];
+      const veraenderung = alt && a[key] !== alt[key] ? ` (${a[key] > alt[key] ? "+" : ""}${a[key] - alt[key]} seit letztem Abruf)` : "";
+      zeigeTip(karte, tip, e, [h("div", { class: "zeile" }, schluessel(kz.farbe), h("b", {}, a[key].toLocaleString("de-DE")), kz.name + veraenderung),
+        h("div", {}, a.titel),
+        h("div", { class: "klein" }, `${a.aufrufe} Aufrufe · ${a.favoriten} Favoriten · ${euro(a.preis)}`)]);
+    });
+    treffer.addEventListener("pointerleave", () => { gruppe.classList.remove("zeile-aktiv"); tip.hidden = true; });
+    svg.append(gruppe);
+  });
+  return svg;
+}
+
+function sparkline(werte, farbe) {
+  const w = 84, hoehe = 22;
+  if (werte.length < 2) return h("span", { class: "klein" }, werte.length ? "erst 1 Abruf" : "–");
+  const max = Math.max(1, ...werte);
+  const pt = werte.map((v, i) => [2 + i * (w - 8) / (werte.length - 1), hoehe - 4 - (v / max) * (hoehe - 8)]);
+  const svg = s("svg", { width: w, height: hoehe, role: "img", "aria-label": `Verlauf: ${werte.join(", ")}` },
+    s("path", { d: pt.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(""), fill: "none",
+      stroke: "var(--viz-leise)", "stroke-width": 1.5, "stroke-linejoin": "round", "stroke-linecap": "round" }),
+    s("circle", { cx: pt[pt.length - 1][0], cy: pt[pt.length - 1][1], r: 3, fill: farbe, stroke: "var(--panel)", "stroke-width": 1.5 }));
+  return svg;
+}
+
+function kachel(titel, wert, alt, verlaufWerte, farbe) {
+  const diff = alt === undefined ? null : wert - alt;
+  return h("div", { class: "kachel" },
+    h("div", { class: "label" }, farbe ? schluessel(farbe) : null, titel),
+    h("div", { class: "wert" }, wert.toLocaleString("de-DE")),
+    h("div", { class: "unten" },
+      diff === null ? h("span", {}, verlaufWerte ? "erster Abruf" : "aktuell bei Vinted")
+        : h("span", { class: diff > 0 ? "delta-plus" : null }, diff > 0 ? `▲ +${diff} seit letztem Abruf` : diff < 0 ? `▼ ${diff} seit letztem Abruf` : "± 0 seit letztem Abruf"),
+      verlaufWerte && verlaufWerte.length > 1 ? sparkline(verlaufWerte.slice(-12), farbe || "var(--viz-1)") : null));
+}
+
+function renderStatistik() {
+  const bereich = document.getElementById("preise");
+  if (!STAT) { fuelle(bereich, h("div", { class: "hilfe" }, "Lädt …")); ladeStatistik(); return; }
+  const verlauf = STAT.verlauf || [];
+  const laeuft = LAGE.auftrag && LAGE.auftrag.laeuft;
+  const knopf = h("button", { class: "knopf haupt", disabled: !LAGE.chrome || laeuft,
+    title: !LAGE.chrome ? "Erst oben den Vinted-Chrome öffnen" : null, onclick: () => starteAuftrag("statistik") }, "Statistik abrufen");
+  const kopf = h("div", { class: "preise-kopf" },
+    h("div", { class: "text" }, verlauf.length
+      ? `Letzter Abruf: ${zeitText(verlauf[verlauf.length - 1].zeit)} · ${verlauf.length} Abruf${verlauf.length === 1 ? "" : "e"} gespeichert. `
+      : "Noch kein Abruf. ",
+      "„Statistik abrufen“ öffnet dein Vinted-Profil im Vinted-Chrome und liest Aufrufe und Favoriten aller Inserate (nur lesen). Jeder Abruf wird gespeichert, so siehst du die Entwicklung."),
+    knopf);
+  if (!verlauf.length) { fuelle(bereich, kopf); return; }
+  const letzter = verlauf[verlauf.length - 1].artikel;
+  const davor = verlauf.length > 1 ? Object.fromEntries(verlauf[verlauf.length - 2].artikel.map((a) => [a.id, a])) : {};
+  const ersteZeit = {};
+  for (const s of verlauf) for (const a of s.artikel) if (!(a.id in ersteZeit)) ersteZeit[a.id] = s.zeit;
+  const reihe = (id) => verlauf.slice(-8).map((s) => (s.artikel.find((a) => a.id === id) || {}).aufrufe).filter((x) => x !== undefined);
+  const zuInserat = Object.fromEntries((D ? D.inserate : []).filter((i) => i.vinted_id).map((i) => [i.vinted_id, i]));
+  const summe = (k) => letzter.reduce((s, a) => s + (a[k] || 0), 0);
+  const zeilen = [...letzter].sort((a, b) => b.aufrufe - a.aufrufe || b.favoriten - a.favoriten);
+
+  // Summen pro Abruf für Kacheln und Verlaufsdiagramm
+  const summen = verlauf.map((st) => ({ zeit: new Date(st.zeit).getTime(), iso: st.zeit,
+    aufrufe: st.artikel.reduce((x, a) => x + (a.aufrufe || 0), 0), favoriten: st.artikel.reduce((x, a) => x + (a.favoriten || 0), 0) }));
+  const jetzt = summen[summen.length - 1], vorher = summen.length > 1 ? summen[summen.length - 2] : null;
+  const online = letzter.filter((a) => !a.verkauft && !a.entwurf).length;
+  const kz = KENNZAHL[kennzahl];
+  const tipLinie = h("div", { class: "viz-tip", hidden: true }), tipBalken = h("div", { class: "viz-tip", hidden: true });
+  const flaecheLinie = h("div", { class: "diagramm-flaeche" }), flaecheBalken = h("div", { class: "diagramm-flaeche" });
+  const karteLinie = h("div", { class: "diagramm-karte" },
+    h("h3", {}, `${kz.name} gesamt pro Abruf`),
+    h("div", { class: "unterzeile" }, summen.length > 1 ? `${summen.length} Abrufe seit ${zeitText(summen[0].iso)}`
+      : "Erst ein Abruf – ab dem zweiten Abruf entsteht hier eine Linie."),
+    flaecheLinie, tipLinie,
+    h("details", {}, h("summary", { style: "cursor:pointer" }, "Werte als Tabelle"),
+      h("table", {}, h("tr", {}, h("th", {}, "Abruf"), h("th", {}, "Aufrufe"), h("th", {}, "Favoriten")),
+        [...summen].reverse().map((p) => h("tr", {}, h("td", {}, zeitText(p.iso)), h("td", {}, p.aufrufe), h("td", {}, p.favoriten))))));
+  const karteBalken = h("div", { class: "diagramm-karte" },
+    h("h3", {}, `${kz.name} je Inserat`),
+    h("div", { class: "unterzeile" }, `Stand ${zeitText(jetzt.iso)} · alle Werte auch in der Tabelle unten`),
+    flaecheBalken, tipBalken);
+  const balkenZeilen = [...letzter].sort((a, b) => b[kennzahl] - a[kennzahl] || b.aufrufe - a.aufrufe);
+
+  fuelle(bereich, kopf,
+    h("div", { class: "kacheln" },
+      kachel("Aufrufe gesamt", jetzt.aufrufe, vorher ? vorher.aufrufe : undefined, summen.map((p) => p.aufrufe), "var(--viz-1)"),
+      kachel("Favoriten gesamt", jetzt.favoriten, vorher ? vorher.favoriten : undefined, summen.map((p) => p.favoriten), "var(--viz-2)"),
+      kachel("Inserate online", online, undefined, null, null)),
+    h("div", { class: "kennzahl-zeile" }, "Diagramme zeigen:",
+      h("div", { class: "ansichten" }, Object.entries(KENNZAHL).map(([k, v]) =>
+        h("button", { "aria-pressed": String(kennzahl === k), onclick: () => { kennzahl = k; merke("kennzahl", k); renderStatistik(); } }, v.name)))),
+    h("div", { class: "diagramme" }, karteLinie, karteBalken),
+    h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+      h("thead", {}, h("tr", {}, ["", "Inserat", "Status", "Preis", "Aufrufe", "Favoriten", "Verlauf Aufrufe", "Erstmals gesehen"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, zeilen.map((a) => {
+        const i = zuInserat[a.id];
+        const alt = davor[a.id] || {};
+        return h("tr", {},
+          h("td", {}, i && (i.fotos || [])[0] ? h("img", { src: bildUrl(i, i.fotos[0], 360), alt: "", loading: "lazy" }) : null),
+          h("td", {}, h("a", { class: "titel-link", href: a.url, target: "_blank", rel: "noopener", style: "color:inherit" }, a.titel),
+            i ? h("div", { class: "klein" }, h("span", { class: "titel-link", onclick: () => zeigeAnsicht("inserate", i.ordner) }, "in der Zentrale öffnen"))
+              : h("div", { class: "klein" }, "nicht in der Zentrale")),
+          h("td", {}, VSTATUS(a)),
+          h("td", { style: "white-space:nowrap" }, euro(a.preis)),
+          h("td", { style: "white-space:nowrap" }, h("b", {}, a.aufrufe), plus(a.aufrufe, alt.aufrufe)),
+          h("td", { style: "white-space:nowrap" }, h("b", {}, a.favoriten), plus(a.favoriten, alt.favoriten)),
+          h("td", { title: reihe(a.id).join(" → ") }, sparkline(reihe(a.id), "var(--viz-1)")),
+          h("td", { class: "klein", style: "white-space:nowrap" }, zeitText(ersteZeit[a.id])));
+      })),
+      h("tfoot", {}, h("tr", {}, h("td", {}), h("td", {}, `${letzter.length} Artikel bei Vinted`), h("td", {}), h("td", {}),
+        h("td", {}, summe("aufrufe")), h("td", {}, summe("favoriten")), h("td", {}), h("td", {}))))));
+
+  // Diagramme erst zeichnen, wenn die Breite der Karten bekannt ist
+  const punkte = summen.map((p) => ({ zeit: p.zeit, wert: p[kennzahl] }));
+  flaecheLinie.append(linienDiagramm(karteLinie, tipLinie, punkte, kz, flaecheLinie.clientWidth));
+  flaecheBalken.append(balkenDiagramm(karteBalken, tipBalken, balkenZeilen, kz, kennzahl, flaecheBalken.clientWidth, davor));
+}
+
+// Bei Größenänderung des Fensters die Diagramme neu zeichnen
+let statBreite = 0, statTimer = null;
+new ResizeObserver((eintraege) => {
+  const b = Math.round(eintraege[0].contentRect.width);
+  if (ansicht !== "statistik" || !STAT || Math.abs(b - statBreite) < 8) return;
+  statBreite = b;
+  clearTimeout(statTimer); statTimer = setTimeout(renderStatistik, 120);
+}).observe(document.getElementById("preise"));
+
+function zeigeAnsicht(a, ordner) {
+  ansicht = a; merke("ansicht", a);
+  if (ordner) aktuell = ordner;
+  if (a === "statistik") ladeStatistik();
+  renderAlles();
+  window.scrollTo({ top: 0 });
+}
+
+function renderKopf() {
+  fuelle(document.getElementById("ansichten"),
+    [["inserate", "Inserate"], ["preise", "Preise"], ["statistik", "Statistik"]].map(([k, name]) =>
+      h("button", { "aria-pressed": String(ansicht === k), onclick: () => zeigeAnsicht(k) }, name)));
+  const anz = (st) => D.inserate.filter((i) => st.includes(i.status)).length;
+  const verkauft = D.inserate.filter((i) => i.status === "verkauft");
+  const erloes = verkauft.reduce((s, i) => s + (zahl(i.preis) || 0), 0);
+  const ohnePreis = D.inserate.filter((i) => !GESPERRT.has(i.status) && !(zahl(i.preis) > 0)).length;
+  fuelle(document.getElementById("statistik"),
+    h("b", {}, D.inserate.length), " Paare · ", h("b", {}, anz(["neu", "zurueckgestellt"])), " zu prüfen · ",
+    h("b", {}, anz(["freigegeben"])), " freigegeben · ", h("b", {}, anz(["entwurf", "online"])), " bei Vinted · ",
+    h("b", {}, verkauft.length), ` verkauft (${euro(erloes)})`,
+    ohnePreis ? [" · ", h("b", {}, ohnePreis), " ohne Preis"] : null);
+  renderChrome();
+}
+
+function renderChrome() {
+  const el = document.getElementById("chrome-status");
+  el.classList.toggle("an", !!LAGE.chrome);
+  const freigegeben = D ? D.inserate.filter((i) => i.status === "freigegeben").length : 0;
+  const laeuft = LAGE.auftrag && LAGE.auftrag.laeuft;
+  const beiVinted = D ? D.inserate.filter((i) => i.status === "online" || i.status === "entwurf").length : 0;
+  fuelle(el,
+    LAGE.chrome && freigegeben && !laeuft ? h("button", { class: "knopf klein", style: "margin-right:6px",
+      title: "Füllt die freigegebenen Inserate nacheinander im Vinted-Chrome aus. Nach jedem wartet es, bis du selbst abgeschickt hast.",
+      onclick: () => starteAuftrag("hochladen") }, `Alle freigegebenen ausfüllen (${freigegeben})`) : null,
+    LAGE.chrome && beiVinted && !laeuft ? h("button", { class: "knopf klein", style: "margin-right:6px",
+      title: "Liest Aufrufe und Favoriten aller deiner Vinted-Inserate und speichert sie im Verlauf (nur lesen).",
+      onclick: () => starteAuftrag("statistik") }, "Statistik abrufen") : null,
+    h("span", { class: "punkt" }), LAGE.chrome ? "Vinted-Chrome offen" : "Vinted-Chrome zu",
+    LAGE.chrome ? null : h("button", { class: "knopf klein", onclick: chromeOeffnen }, "Öffnen"));
+}
+
+async function chromeOeffnen() {
+  try {
+    await api("/api/chrome-oeffnen", {});
+    toast("Vinted-Chrome wird geöffnet. Beim ersten Mal dort selbst einloggen.");
+    setTimeout(lageAbfragen, 2500);
+  } catch (e) { toast("Fehler: " + e.message); }
+}
+
+async function starteAuftrag(name, ordner) {
+  try {
+    await speichernJetzt();
+    LAGE.auftrag = await api("/api/auftrag", { name, ordner: ordner || "" });
+    auftragZu = false;
+    renderAuftrag();
+    planeLage(1500);
+  } catch (e) { toast(e.message); }
+}
+
+async function stoppeAuftrag() {
+  try { LAGE.auftrag = await api("/api/auftrag-stoppen", {}); renderAuftrag(); } catch (e) { toast(e.message); }
+}
+
+function renderAuftrag() {
+  const box = document.getElementById("auftrag");
+  const a = LAGE.auftrag;
+  if (!a || (!a.laeuft && (a.ende === null || auftragZu)) || !a.titel) { box.hidden = true; return; }
+  box.hidden = false;
+  const i = a.ordner && D && finde(a.ordner);
+  fuelle(box,
+    h("h3", {}, a.laeuft ? "⏳" : (a.ende === 0 ? "✓" : "⚠"), a.titel),
+    i ? h("div", { class: "hilfe", style: "margin-bottom:6px;font-size:13px" }, i.titel) : null,
+    a.laeuft ? h("div", { style: "font-size:13px;margin-bottom:6px" },
+      "Läuft im Vinted-Chrome. Prüfe dort das Formular und klicke selbst auf „Save draft“ oder „Upload“.") : null,
+    h("pre", {}, (a.log || []).slice(-12).join("\n") || "…"),
+    h("div", { class: "werkzeuge", style: "margin-top:0" },
+      a.laeuft ? h("button", { class: "knopf klein", onclick: stoppeAuftrag }, "Abbrechen")
+               : h("button", { class: "knopf klein", onclick: () => { auftragZu = true; renderAuftrag(); } }, "Schließen")));
+  const pre = box.querySelector("pre"); pre.scrollTop = pre.scrollHeight;
+}
+
+// Regelmäßig nachfragen: Chrome offen? Auftrag fertig? Datei von außen geändert?
+let lageTimer = null;
+function planeLage(ms) { clearTimeout(lageTimer); lageTimer = setTimeout(lageAbfragen, ms); }
+async function lageAbfragen() {
+  let naechste = 5000;
+  try {
+    const war = LAGE.auftrag && LAGE.auftrag.laeuft;
+    const s = await api("/api/status");
+    LAGE.chrome = s.chrome; LAGE.auftrag = s.auftrag;
+    renderChrome(); renderAuftrag();
+    if (D && ansicht === "inserate") renderAktionen();
+    if (s.auftrag.laeuft) naechste = 1500;
+    if (war && !s.auftrag.laeuft && ansicht === "statistik") ladeStatistik();
+    const tippt = document.activeElement && document.activeElement.matches("input, textarea, select");
+    if (D && s.version !== D.version && !offen.felder && !tippt && !document.hidden) {
+      await speicherKette.catch(() => {});
+      if (await laden() && war && !s.auftrag.laeuft) toast("Auftrag fertig, Daten aktualisiert.");
+    }
+  } catch (e) { /* Server kurz nicht erreichbar */ }
+  planeLage(naechste);
+}
+
+function renderFilter() {
+  const nav = document.getElementById("filter");
+  nav.replaceChildren(...FILTER.map(([k, name]) => {
+    const n = k === "alle" ? D.inserate.length : D.inserate.filter((i) => i.status === k).length;
+    if (n === 0 && k !== "alle" && k !== filter) return null;
+    return h("button", { class: "chip", "aria-pressed": String(filter === k), onclick: () => { filter = k; merke("filter", k); renderAlles(); } },
+      name, h("span", { class: "n" }, n));
+  }).filter(Boolean));
+}
+
+function renderListe() {
+  const liste = document.getElementById("liste");
+  const eintraege = sichtbare();
+  if (!eintraege.length) {
+    liste.replaceChildren(h("div", { class: "leer-liste" }, D.inserate.length
+      ? "Keine Inserate mit diesem Status."
+      : "Noch keine Artikel. Lege pro Artikel einen Ordner mit Fotos im Artikel-Ordner an und lass Claude die Inserate erstellen."));
+    return;
+  }
+  liste.replaceChildren(...eintraege.map((i) => {
+    const f = fehlt(i);
+    const erstes = (i.fotos || [])[0];
+    return h("div", { class: "eintrag", "aria-current": String(i.ordner === aktuell), "data-ordner": i.ordner, onclick: () => waehle(i.ordner, true) },
+      erstes ? h("img", { src: bildUrl(i, erstes, 360), alt: "", loading: "lazy" }) : h("div", { class: "ohne-bild" }),
+      h("div", { style: "min-width:0" },
+        h("div", { class: "t" }, i.titel || i.ordner),
+        h("div", { class: "zeile" },
+          h("span", { class: `pill s-${i.status}` }, STATUS_TEXT[i.status] || i.status),
+          GESPERRT.has(i.status) ? null : (f.length ? h("span", { class: "badge-fehlt" }, `${f.length} fehlt`) : h("span", { class: "badge-ok" }, "vollständig")),
+          i.vinted_stats ? h("span", { class: "pill", style: "border-color:transparent;color:var(--muted)",
+            title: `Stand ${zeitText(i.vinted_stats.zeit)}` }, `👁 ${i.vinted_stats.aufrufe} · ♥ ${i.vinted_stats.favoriten}`) : null,
+          i.preis ? h("span", { class: "pill", style: "border-color:transparent;color:var(--muted)" }, `${String(i.preis).replace(".", ",")} €`) : null)));
+  }));
+}
+
+async function waehle(ordner, mobil) {
+  try { await speichernJetzt(); } catch (e) { return; }
+  aktuell = ordner;
+  if (mobil) document.body.classList.add("mobil-detail");
+  renderListe(); renderDetail();
+  window.scrollTo({ top: 0 });
+}
+
+function renderDetail() {
+  const detail = document.getElementById("detail");
+  const aktionen = document.getElementById("aktionen");
+  const i = aktuell && finde(aktuell);
+  if (!i) { detail.replaceChildren(); aktionen.hidden = true; return; }
+  const gesperrt = GESPERRT.has(i.status);
+
+  const kopf = h("div", { class: "detail-kopf" },
+    h("button", { class: "knopf zurueck", onclick: () => document.body.classList.remove("mobil-detail") }, "← Liste"),
+    h("div", { class: "titel-block" },
+      h("div", { class: "ordner" }, i.ordner),
+      h("h2", { id: "kopf-titel" }, i.titel || "(noch kein Titel)")),
+    h("span", { class: `pill s-${i.status}`, style: "margin-top:6px" }, STATUS_TEXT[i.status] || i.status),
+    h("div", { id: "speicher", class: "speicher" }));
+
+  const ohneText = !i.titel && !i.beschreibung && !(i.hinweise || []).length;
+  fuelle(detail,
+    kopf,
+    ohneText ? h("div", { class: "box info" }, "Für diesen Ordner gibt es noch keinen Inseratstext. Sag Claude z. B.: „Analysiere die neuen Ordner und fülle die Inserate aus.“") : null,
+    renderKonflikt(i),
+    h("div", { id: "fehlt-box" }),
+    (i.hinweise || []).length ? h("div", { class: "box hinweis" }, h("h3", {}, "Hinweise aus der Foto-Analyse"),
+      h("ul", {}, i.hinweise.map((t) => h("li", {}, t)))) : null,
+    gesperrt ? h("div", { class: "box info" }, "Dieses Inserat ist schon bei Vinted. Änderungen hier ändern es dort nicht, deshalb sind die Felder gesperrt.") : null,
+    renderFotos(i, gesperrt),
+    renderFelder(i, gesperrt),
+    renderAnalyse(i),
+    h("div", { class: "tasten" }, h("kbd", {}, "↑"), " ", h("kbd", {}, "↓"), " vorheriges/nächstes Inserat",
+      i.status === "neu" || i.status === "zurueckgestellt" ? [" · ", h("kbd", {}, "Strg"), "+", h("kbd", {}, "Enter"), " freigeben"] : null));
+  renderFehlt();
+  renderAktionen();
+}
+
+function renderKonflikt(i) {
+  const k = KONFLIKT[i.ordner];
+  if (!k || !Object.keys(k).length) return null;
+  const uebernehmen = (feld) => {
+    const wert = k[feld];
+    delete k[feld];
+    i[feld] = wert;
+    speichern({ [feld]: wert }, true);
+    renderDetail(); renderListe();
+  };
+  const verwerfen = (feld) => { delete k[feld]; renderDetail(); };
+  return h("div", { class: "box fehlt" },
+    h("h3", {}, "Dieses Inserat wurde inzwischen woanders geändert (z. B. von Claude)"),
+    h("div", { style: "margin-bottom:6px" }, "Oben steht jetzt der neue Stand. Deine Eingabe wurde nicht gespeichert:"),
+    Object.entries(k).map(([feld, wert]) => h("div", { style: "margin:8px 0" },
+      h("strong", {}, (FELDNAME[feld] || feld) + ": "),
+      h("span", { style: "white-space:pre-wrap" }, Array.isArray(wert) ? wert.join(", ") : String(wert ?? "")),
+      h("div", { class: "werkzeuge" },
+        h("button", { class: "knopf klein", onclick: () => uebernehmen(feld) }, "Meine Version übernehmen"),
+        h("button", { class: "knopf klein", onclick: () => verwerfen(feld) }, "Verwerfen")))));
+}
+
+function renderFehlt() {
+  const i = finde(aktuell); const box = document.getElementById("fehlt-box");
+  if (!i || !box) return;
+  if (GESPERRT.has(i.status)) { box.replaceChildren(); return; }
+  const f = fehlt(i); const t = tipps(i);
+  document.querySelectorAll(".ist-fehlt").forEach((el) => el.classList.remove("ist-fehlt"));
+  f.forEach((x) => x.feld && document.querySelector(`#detail [data-feld="${x.feld}"]`)?.classList.add("ist-fehlt"));
+  const beantwortet = (i.fragen || []).filter((q) => q.antwort);
+  const letzte = (i.verlauf || []).slice(-1)[0];
+  fuelle(box,
+    f.length
+      ? h("div", { class: "box fehlt" }, h("h3", {}, `Fehlt noch (${f.length})`),
+          h("ul", { class: "fragen" }, f.map((x) => h("li", {}, x.frage ? renderFrage(i, x.frage)
+            : x.feld ? h("a", { onclick: () => fokus(x.feld) }, x.text) : x.text))))
+      : h("div", { class: "box ok" }, h("h3", { style: "margin:0" }, "✓ Alles Nötige ist ausgefüllt")),
+    beantwortet.length ? h("details", { class: "beantwortet" },
+      h("summary", {}, `${beantwortet.length} ${beantwortet.length === 1 ? "Frage" : "Fragen"} beantwortet`),
+      h("ul", {}, beantwortet.map((q) => h("li", {}, `${q.frage} → ${q.antwort}`,
+        q.hinweis ? h("span", { style: "color:var(--rot)" }, ` (${q.hinweis})`) : null,
+        letzte && letzte.frage === q.id ? [" ", h("button", { class: "knopf klein", onclick: () => zuruecknehmen(i) }, "Rückgängig")] : null)))) : null,
+    t.length ? h("div", { class: "box hinweis" }, h("h3", {}, "Tipps"), h("ul", {}, t.map((x) => h("li", {}, x)))) : null);
+}
+
+function renderFrage(i, q) {
+  const gesperrt = GESPERRT.has(i.status);
+  const eingaben = {};
+  return h("div", {},
+    h("div", { class: "frage-text" }, q.frage),
+    q.erklaerung ? h("div", { class: "frage-info" }, q.erklaerung) : null,
+    h("div", { class: "werkzeuge" }, (q.optionen || []).map((opt, idx) => {
+      if (!opt.eingabe) return h("button", { class: "knopf klein", disabled: gesperrt, onclick: () => beantworten(i, q, idx, "") }, opt.label);
+      const feld = h("input", { type: "text", class: "frage-eingabe", placeholder: opt.platzhalter || opt.label, disabled: gesperrt,
+        "aria-label": opt.label, onkeydown: (e) => { if (e.key === "Enter") beantworten(i, q, idx, e.target.value); } });
+      return h("span", { class: "frage-wert" }, feld,
+        h("button", { class: "knopf klein", disabled: gesperrt, onclick: () => beantworten(i, q, idx, feld.value) }, opt.knopf || "OK"));
+    })));
+}
+
+async function beantworten(i, q, option, wert) {
+  if (beantworten.laeuft) return;
+  const opt = q.optionen[option];
+  if (opt.eingabe && !String(wert).trim()) { toast("Bitte erst einen Wert eintragen."); return; }
+  beantworten.laeuft = true;
+  try {
+    await speichernJetzt();
+    const neu = await api("/api/antwort", { ordner: i.ordner, frage: q.id, option, wert });
+    Object.assign(i, neu); merkeServer(neu);
+    if (neu._version) D.version = neu._version;
+    renderDetail(); renderListe(); renderKopf();
+  } catch (e) { toast("Nicht übernommen: " + e.message); }
+  finally { beantworten.laeuft = false; }
+}
+
+async function zuruecknehmen(i) {
+  try {
+    await speichernJetzt();
+    const neu = await api("/api/antwort-zurueck", { ordner: i.ordner });
+    Object.assign(i, neu); merkeServer(neu);
+    if (neu._version) D.version = neu._version;
+    renderDetail(); renderListe(); renderKopf();
+  } catch (e) { toast(e.message); }
+}
+
+function fokus(feld) {
+  const el = document.querySelector(`#detail [data-feld="${feld}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.querySelector("input, select, textarea")?.focus({ preventScroll: true });
+}
+
+function renderFotos(i, gesperrt) {
+  const gewaehlt = i.fotos || [];
+  const unbenutzt = (i._alle_fotos || []).filter((f) => !gewaehlt.includes(f));
+  const setze = (neu) => { i.fotos = neu; speichern({ fotos: neu }, true); renderDetail(); renderListe(); };
+  const karte = (datei, idx, aus) => h("div", { class: "foto" + (aus ? " aus" : "") },
+    h("img", { src: bildUrl(i, datei, 360), alt: datei, loading: "lazy", title: datei, onclick: () => zeigeBild(i, datei) }),
+    !aus && idx === 0 ? h("span", { class: "titelbild" }, "Titelbild") : null,
+    gesperrt ? null : h("div", { class: "steuer" }, aus
+      ? [h("button", { class: "knopf klein", onclick: () => setze([...gewaehlt, datei]) }, "+ verwenden")]
+      : [h("button", { class: "knopf klein", disabled: idx === 0, title: "nach vorn", onclick: () => { const n = [...gewaehlt]; [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]; setze(n); } }, "◀"),
+         h("button", { class: "knopf klein", title: "nicht verwenden", onclick: () => setze(gewaehlt.filter((f) => f !== datei)) }, "✕"),
+         h("button", { class: "knopf klein", disabled: idx === gewaehlt.length - 1, title: "nach hinten", onclick: () => { const n = [...gewaehlt]; [n[idx + 1], n[idx]] = [n[idx], n[idx + 1]]; setze(n); } }, "▶")]));
+  return h("div", { class: "karte", "data-feld": "fotos" },
+    h("h3", {}, "Fotos", h("small", {}, `${gewaehlt.length} ausgewählt · das erste ist das Titelbild · max. 20`)),
+    gewaehlt.length ? h("div", { class: "fotos" }, gewaehlt.map((f, idx) => karte(f, idx, false))) : h("div", { class: "hilfe" }, "Keine Fotos ausgewählt."),
+    unbenutzt.length ? [h("div", { class: "hilfe", style: "margin:12px 0 6px;color:var(--muted);font-size:13px" }, "Nicht verwendet"),
+      h("div", { class: "fotos" }, unbenutzt.map((f) => karte(f, -1, true)))] : null);
+}
+
+function feld(i, key, label, opt) {
+  opt = opt || {};
+  const wert = i[key] === null || i[key] === undefined ? "" : String(i[key]).replace(opt.zahl ? "." : /^$/, opt.zahl ? "," : "");
+  const attrs = { id: "f-" + key, readonly: opt.gesperrt, disabled: opt.gesperrt && opt.auswahl ? true : null,
+    oninput: (e) => aenderung(key, e.target.value), onblur: () => speichernJetzt().catch(() => {}), onchange: (e) => { aenderung(key, e.target.value); speichernJetzt().catch(() => {}); } };
+  let eingabe;
+  if (opt.auswahl) {
+    const optionen = [...opt.auswahl];
+    if (wert && !optionen.includes(wert)) optionen.unshift(wert);
+    eingabe = h("select", attrs, h("option", { value: "" }, "– bitte wählen –"),
+      optionen.map((o) => h("option", { value: o, selected: o === wert }, o)));
+  } else if (opt.lang) {
+    eingabe = h("textarea", attrs); eingabe.value = wert;
+  } else {
+    eingabe = h("input", Object.assign(attrs, { type: "text", inputmode: opt.zahl ? "decimal" : null, placeholder: opt.platzhalter || null }));
+    eingabe.value = wert;
+  }
+  const zaehler = opt.zaehler ? h("span", { id: "z-" + key }, `${wert.length} Zeichen`) : null;
+  return h("div", { class: "feld" + (opt.breit ? " breit" : ""), "data-feld": key },
+    h("label", { class: "label", for: "f-" + key }, label,
+      h("span", { class: "rechts" }, zaehler, opt.kopieren === false ? null
+        : h("button", { class: "knopf klein", type: "button", title: "in die Zwischenablage", onclick: () => kopiere(document.getElementById("f-" + key).value, label) }, "Kopieren"))),
+    eingabe,
+    opt.hilfe ? h("div", { class: "hilfe" }, opt.hilfe) : null);
+}
+
+function renderFelder(i, gesperrt) {
+  const g = { gesperrt };
+  return h("div", { class: "karte" }, h("h3", {}, "Inserat"),
+    h("div", { class: "raster" },
+      feld(i, "titel", "Titel", Object.assign({ breit: true, zaehler: true }, g)),
+      feld(i, "beschreibung", "Beschreibung", Object.assign({ breit: true, lang: true, zaehler: true }, g)),
+      feld(i, "kategorie", "Kategorie", Object.assign({ breit: true, platzhalter: "z. B. Women > Shoes > Boots > Ankle boots", hilfe: "So wie die Kategorien bei Vinted heißen, Ebenen mit > trennen" }, g)),
+      feld(i, "marke", "Marke", Object.assign({ platzhalter: "z. B. Levi's oder Ohne Marke" }, g)),
+      feld(i, "groesse", "Größe (EU)", Object.assign({ platzhalter: "z. B. 39" }, g)),
+      feld(i, "zustand", "Zustand", Object.assign({ auswahl: D.zustaende, kopieren: false }, g)),
+      feld(i, "farbe", "Farbe", g),
+      feld(i, "material", "Material", Object.assign({ hilfe: "optional" }, g)),
+      feld(i, "schuhform", "Schuhform", Object.assign({ platzhalter: "z. B. Chelsea Boot, runde Spitze, Blockabsatz", hilfe: "optional" }, g)),
+      feld(i, "absatzhoehe", "Absatzhöhe", Object.assign({ platzhalter: "z. B. ca. 6 cm", hilfe: "optional, aus dem Foto geschätzt, am besten nachmessen" }, g)),
+      feld(i, "paket", "Paketgröße", Object.assign({ auswahl: D.pakete, kopieren: false }, g)),
+      feld(i, "preis", "Preis (€)", Object.assign({ zahl: true, hilfe: preisHilfe(i) }, g)),
+      feld(i, "preis_min", "Mindestpreis (€), nur für dich", Object.assign({ zahl: true, kopieren: false, hilfe: "Angebote darunter ablehnen" }, g)),
+      feld(i, "notiz", "Notiz, nur für dich", { breit: true, kopieren: false })));
+}
+
+const euro = (v) => (v === null || v === undefined || v === "") ? "–" : `${String(v).replace(".", ",")} €`;
+
+function setzePreis(i, wert, neuZeichnen) {
+  i.preis = wert;
+  speichern({ preis: wert }, true, i.ordner);
+  if (neuZeichnen) neuZeichnen();
+}
+
+function preisWahl(i, neuZeichnen) {
+  const vp = i.vinted_preis || {};
+  const knopf = (wert, text) => wert ? h("button", { class: "knopf klein", title: "als Preis übernehmen",
+    onclick: () => setzePreis(i, wert, neuZeichnen) }, text) : null;
+  return [knopf(i.preis_vorschlag, `Vorschlag ${euro(i.preis_vorschlag)}`),
+          knopf(vp.guenstig, `${euro(vp.guenstig)} günstig`), knopf(vp.optimal, `${euro(vp.optimal)} optimal`),
+          knopf(vp.premium, `${euro(vp.premium)} premium`)];
+}
+
+function preisHilfe(i) {
+  const vp = i.vinted_preis;
+  const gesperrt = GESPERRT.has(i.status);
+  return [
+    gesperrt ? null : h("div", { class: "werkzeuge", style: "margin:2px 0 4px" }, preisWahl(i, renderDetail)),
+    vp ? h("div", {}, h("strong", {}, "Vinted empfiehlt: "),
+      `${euro(vp.guenstig)} günstig · ${euro(vp.optimal)} optimal · ${euro(vp.premium)} premium`,
+      vp.datum ? ` (ausgelesen am ${vp.datum})` : "")
+       : h("div", {}, "Vinted-Empfehlung noch nicht abgefragt (Ansicht „Preise“ → „Vinted-Preise abfragen“)."),
+    i.preis_begruendung ? h("div", {}, h("strong", {}, "Recherche: "), i.preis_begruendung) : null,
+  ];
+}
+
+function renderPreise() {
+  const bereich = document.getElementById("preise");
+  const liste = D.inserate.filter((i) => i.status !== "verkauft");
+  const mitPreis = liste.filter((i) => zahl(i.preis) > 0);
+  const summe = (feld) => liste.reduce((s, i) => s + (zahl(feld(i)) || 0), 0);
+  const zahlFeld = (i, key) => {
+    const gesperrt = GESPERRT.has(i.status);
+    const el = h("input", { type: "text", inputmode: "decimal", readonly: gesperrt, "aria-label": key,
+      class: key === "preis" && !(zahl(i.preis) > 0) ? "leer" : null,
+      placeholder: key === "preis" ? "Preis" : "optional",
+      oninput: (e) => {
+        const w = e.target.value;
+        i[key] = w;
+        e.target.classList.toggle("leer", key === "preis" && !(zahl(w) > 0));
+        if (!w.trim() || Number.isFinite(zahl(w))) speichern({ [key]: w }, false, i.ordner);
+      },
+      onblur: () => speichernJetzt().catch(() => {}) });
+    el.value = i[key] === null || i[key] === undefined ? "" : String(i[key]).replace(".", ",");
+    return el;
+  };
+  const vpText = (i) => i.vinted_preis
+    ? `${euro(i.vinted_preis.guenstig)} / ${euro(i.vinted_preis.optimal)} / ${euro(i.vinted_preis.premium)}`
+    : h("span", { class: "klein" }, "noch nicht abgefragt");
+  fuelle(bereich,
+    h("div", { class: "preise-kopf" },
+      h("div", { class: "text" }, "Hier legst du die Preise fest. Ein Klick auf einen Vorschlag übernimmt ihn, oder du tippst selbst. ",
+        "„Vorschlag“ stammt aus der Recherche, die drei Vinted-Werte (günstig / optimal / premium) aus Vinteds eigener Empfehlung."),
+      h("button", { class: "knopf", onclick: () => starteAuftrag("preise"),
+        title: "Füllt im Vinted-Chrome nur Kategorie, Marke, Größe und Zustand aus, liest die Empfehlung und schließt den Tab ohne zu speichern" },
+        "Vinted-Preise abfragen")),
+    h("div", { class: "tabelle-rahmen" }, h("table", { class: "tabelle" },
+      h("thead", {}, h("tr", {}, ["", "Inserat", "Status", "Vinted", "Übernehmen", "Preis €", "Mindestpreis €"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, liste.map((i) => h("tr", {},
+        h("td", {}, (i.fotos || [])[0] ? h("img", { src: bildUrl(i, i.fotos[0], 360), alt: "", loading: "lazy" }) : null),
+        h("td", {}, h("div", { class: "titel-link", onclick: () => zeigeAnsicht("inserate", i.ordner) }, i.titel || i.ordner),
+          h("div", { class: "klein" }, [i.marke, !LEER.test(i.groesse ?? "") && `Gr. ${i.groesse}`, i.zustand].filter((x) => x && !LEER.test(x)).join(" · "))),
+        h("td", {}, h("span", { class: `pill s-${i.status}` }, STATUS_TEXT[i.status] || i.status)),
+        h("td", { style: "white-space:nowrap" }, vpText(i)),
+        h("td", {}, GESPERRT.has(i.status) ? null : h("div", { class: "wahl" }, preisWahl(i, renderPreise))),
+        h("td", {}, zahlFeld(i, "preis")),
+        h("td", {}, zahlFeld(i, "preis_min"))))),
+      h("tfoot", {}, h("tr", {},
+        h("td", {}), h("td", {}, `${mitPreis.length} von ${liste.length} mit Preis`), h("td", {}), h("td", {}), h("td", {}),
+        h("td", {}, euro(Math.round(summe((i) => i.preis) * 100) / 100)),
+        h("td", {}, euro(Math.round(summe((i) => i.preis_min) * 100) / 100)))))));
+}
+
+function renderAnalyse(i) {
+  const a = i.analyse;
+  if (!a) return null;
+  const zeile = (name, wert) => wert && (Array.isArray(wert) ? wert.length : String(wert).trim())
+    ? h("div", { style: "margin:8px 0" }, h("strong", {}, name + ": "),
+        Array.isArray(wert) ? h("ul", { style: "margin:4px 0;padding-left:20px" }, wert.map((w) => h("li", {}, w))) : String(wert))
+    : null;
+  return h("details", { class: "karte" },
+    h("summary", { style: "cursor:pointer;font-weight:600" }, "Woran wurde das erkannt? (Foto-Analyse)"),
+    h("div", { style: "font-size:13.5px;color:var(--muted);margin-top:8px" },
+      zeile("Modell", a.modell), zeile("Marke", a.marke_beleg), zeile("Größe", a.groesse_beleg),
+      zeile("Zustand", a.zustand_begruendung), zeile("Mängel", a.maengel), zeile("Absatz/Form", a.form_beleg),
+      zeile("Preisquellen", a.preis_quellen)));
+}
+
+function renderAktionen() {
+  const leiste = document.getElementById("aktionen");
+  const i = finde(aktuell);
+  if (!i) { leiste.hidden = true; return; }
+  leiste.hidden = false;
+  const f = fehlt(i);
+  const knopf = (text, status, haupt, extra) => h("button", Object.assign({ class: "knopf" + (haupt ? " haupt" : ""),
+    onclick: () => setzeStatus(status) }, extra || {}), text);
+  const teile = [];
+  if (i.status === "neu" || i.status === "zurueckgestellt") {
+    teile.push(h("div", { class: "text" }, f.length ? `Noch ${f.length} ${f.length === 1 ? "Angabe fehlt" : "Angaben fehlen"}, siehe oben.` : "Bereit. Nach der Freigabe kann das Inserat hochgeladen werden."));
+    teile.push(i.status === "neu" ? knopf("Zurückstellen", "zurueckgestellt") : knopf("Wieder prüfen", "neu"));
+    teile.push(knopf("Freigeben ✓", "freigegeben", true, { disabled: f.length > 0, title: f.length ? "Erst die fehlenden Angaben ergänzen" : null }));
+  } else if (i.status === "freigegeben") {
+    const laeuft = LAGE.auftrag && LAGE.auftrag.laeuft;
+    teile.push(h("div", { class: "text" }, "Freigegeben. „In Vinted ausfüllen“ füllt das Formular im Vinted-Chrome aus, absenden machst du dort selbst.",
+      h("div", { class: "werkzeuge" },
+        h("button", { class: "knopf klein", onclick: fotosBereitstellen }, "Von Hand: Fotos bereitstellen"),
+        h("a", { class: "knopf klein", href: D.domain + "/items/new", target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Vinted-Formular öffnen ↗"))));
+    teile.push(knopf("Freigabe zurücknehmen", "neu"));
+    teile.push(h("button", { class: "knopf haupt", disabled: laeuft || !LAGE.chrome,
+      title: !LAGE.chrome ? "Erst oben den Vinted-Chrome öffnen" : (laeuft ? "Es läuft schon ein Auftrag" : null),
+      onclick: () => starteAuftrag("ausfuellen", i.ordner) }, "In Vinted ausfüllen"));
+  } else if (i.status === "entwurf") {
+    teile.push(h("div", { class: "text" }, "Bei Vinted angelegt (als Entwurf oder schon hochgeladen). Dort prüfen, dann hier den Status setzen.",
+      i.vinted_url ? h("div", { class: "werkzeuge" }, h("a", { class: "knopf klein", href: i.vinted_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Bei Vinted ansehen ↗")) : null));
+    teile.push(knopf("Zurück auf freigegeben", "freigegeben"));
+    teile.push(knopf("Ist online ✓", "online", true));
+  } else if (i.status === "online") {
+    const st = i.vinted_stats;
+    teile.push(h("div", { class: "text" }, "Online bei Vinted.",
+      st ? [" ", h("b", {}, `${st.aufrufe} Aufrufe`), plus(st.aufrufe, st.aufrufe_vorher), " · ", h("b", {}, `${st.favoriten} Favoriten`),
+            plus(st.favoriten, st.favoriten_vorher), ` (Stand ${zeitText(st.zeit)})`] : " Noch keine Statistik abgerufen.",
+      i.vinted_url ? h("div", { class: "werkzeuge" }, h("a", { class: "knopf klein", href: i.vinted_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Bei Vinted ansehen ↗")) : null));
+    teile.push(knopf("Zurück auf freigegeben", "freigegeben"));
+    teile.push(knopf("Verkauft ✓", "verkauft", true));
+  } else if (i.status === "verkauft") {
+    teile.push(h("div", { class: "text" }, "Verkauft 🎉"));
+    teile.push(knopf("Doch nicht verkauft", "online"));
+  }
+  leiste.replaceChildren(...teile);
+}
+
+/* ---------- Ändern & Speichern ---------- */
+
+function aenderung(key, wert) {
+  const i = finde(aktuell);
+  if (!i || i[key] === wert) return;
+  i[key] = wert;
+  const z = document.getElementById("z-" + key);
+  if (z) z.textContent = `${wert.length} Zeichen`;
+  if (key === "titel") document.getElementById("kopf-titel").textContent = wert || "(noch kein Titel)";
+  // Ungültige Zahlen nicht senden (sonst blockieren sie das Speichern der anderen Felder)
+  const zahlFeld = key === "preis" || key === "preis_min";
+  if (!zahlFeld || !String(wert).trim() || Number.isFinite(zahl(wert))) speichern({ [key]: wert });
+  renderFehlt(); renderAktionen();
+  if (key === "titel" || key === "preis") renderListe(); else aktualisiereBadge(i);
+}
+
+function aktualisiereBadge(i) {
+  const el = document.querySelector(`.eintrag[data-ordner="${CSS.escape(i.ordner)}"] .badge-fehlt, .eintrag[data-ordner="${CSS.escape(i.ordner)}"] .badge-ok`);
+  if (!el) return;
+  const n = fehlt(i).length;
+  el.className = n ? "badge-fehlt" : "badge-ok";
+  el.textContent = n ? `${n} fehlt` : "vollständig";
+}
+
+function zeigeSpeicher(text, fehler) {
+  const el = document.getElementById("speicher");
+  if (el) { el.textContent = text; el.classList.toggle("fehler", !!fehler); }
+}
+
+function speichern(aenderungen, sofort, ordner) {
+  const ziel = ordner || aktuell;
+  if (offen.ordner && offen.ordner !== ziel) speichernJetzt().catch(() => {});
+  offen.ordner = ziel;
+  offen.felder = Object.assign(offen.felder || {}, aenderungen);
+  zeigeSpeicher("Ungespeichert …");
+  clearTimeout(speicherTimer);
+  speicherTimer = setTimeout(() => speichernJetzt().catch(() => {}), sofort ? 0 : 700);
+}
+
+// Speichervorgänge laufen nacheinander, damit ein älterer Stand nie einen neueren überholt.
+function speichernJetzt() {
+  clearTimeout(speicherTimer);
+  if (offen.felder && offen.ordner) {
+    const auftrag = { ordner: offen.ordner, aenderungen: offen.felder };
+    offen = {};
+    zeigeSpeicher("Speichert …");
+    speicherKette = speicherKette.catch(() => {}).then(() => sende(auftrag));
+  }
+  return speicherKette;
+}
+
+// Sendet Änderungen samt dem Stand, von dem die Seite ausging. Hat jemand anderes das Feld
+// inzwischen geändert, lehnt der Server ab (409) und die Seite zeigt beide Versionen.
+async function sende(auftrag) {
+  const basis = {};
+  const alt = SERVER[auftrag.ordner] || {};
+  for (const k of Object.keys(auftrag.aenderungen)) if (k in alt) basis[k] = alt[k];
+  try {
+    const neu = await api("/api/inserat", Object.assign({ basis }, auftrag));
+    uebernimmServerStand(neu, Object.keys(auftrag.aenderungen));
+    if (auftrag.ordner === aktuell && !offen.felder) zeigeSpeicher("Gespeichert ✓");
+    if (ansicht === "preise") renderKopf();
+  } catch (e) {
+    if (e.status === 409 && e.daten && e.daten.inserat) {
+      const verworfen = {};
+      for (const k of e.daten.konflikt || []) verworfen[k] = auftrag.aenderungen[k];
+      KONFLIKT[auftrag.ordner] = Object.assign(KONFLIKT[auftrag.ordner] || {}, verworfen);
+      const i = finde(auftrag.ordner);
+      if (i) Object.assign(i, e.daten.inserat);
+      merkeServer(e.daten.inserat);
+      zeigeSpeicher("Konflikt, siehe oben", true);
+      if (auftrag.ordner === aktuell) { renderDetail(); renderListe(); }
+      return;
+    }
+    offen = { ordner: auftrag.ordner, felder: Object.assign(auftrag.aenderungen, offen.felder || {}) };
+    zeigeSpeicher("Nicht gespeichert!", true);
+    toast("Speichern fehlgeschlagen: " + e.message);
+    throw e;
+  }
+}
+
+function uebernimmServerStand(neu, felder) {
+  const i = finde(neu.ordner);
+  if (i) for (const k of ["status", "geaendert", "fotos", "_ordner_fehlt", "_alle_fotos", "_fotos_fehlen"]) i[k] = neu[k];
+  const server = SERVER[neu.ordner] || (SERVER[neu.ordner] = {});
+  for (const k of felder.concat(["status", "fotos"])) server[k] = kopie(neu[k]);
+  if (neu._version) D.version = neu._version;
+}
+
+async function setzeStatus(status) {
+  const i = finde(aktuell);
+  if (!i || setzeStatus.laeuft) return;
+  if (status === "freigegeben" && fehlt(i).length) { toast("Erst die fehlenden Angaben ergänzen."); return; }
+  setzeStatus.laeuft = true;
+  try {
+    await speichernJetzt();
+    const neu = await api("/api/inserat", { ordner: i.ordner, aenderungen: { status }, basis: { status: (SERVER[i.ordner] || {}).status } });
+    uebernimmServerStand(neu, ["status"]);
+  } catch (e) {
+    toast(e.status === 409 ? "Der Status wurde inzwischen woanders geändert. Bitte neu laden." : "Status nicht geändert: " + e.message);
+    return;
+  } finally {
+    setzeStatus.laeuft = false;
+  }
+  if (status === "freigegeben") {
+    toast("Freigegeben ✓");
+    const kandidaten = sichtbare().filter((x) => x.ordner !== i.ordner && (x.status === "neu" || x.status === "zurueckgestellt"));
+    const naechstes = kandidaten.find((x) => x.ordner > i.ordner) || kandidaten[0];
+    if (naechstes) aktuell = naechstes.ordner;
+    window.scrollTo({ top: 0 });
+  }
+  renderAlles();
+}
+
+async function fotosBereitstellen() {
+  const i = finde(aktuell);
+  if (!i || fotosLaeuft) return;
+  fotosLaeuft = true;
+  toast("Fotos werden vorbereitet …");
+  try {
+    await speichernJetzt();
+    const r = await api("/api/fotos-bereitstellen", { ordner: i.ordner });
+    toast(`${r.anzahl} Fotos liegen als 01.jpg, 02.jpg … im geöffneten Ordner, ohne GPS-Daten. Einfach zu Vinted ziehen.`);
+  } catch (e) { toast("Fehler: " + e.message); }
+  finally { fotosLaeuft = false; }
+}
+
+async function kopiere(text, label) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  toast(`${label} kopiert`);
+}
+
+/* ---------- Bilder & Tasten ---------- */
+
+function zeigeBild(i, datei) {
+  const lb = document.getElementById("lightbox");
+  const alle = [...(i.fotos || []), ...(i._alle_fotos || []).filter((f) => !(i.fotos || []).includes(f))];
+  lightboxIndex = alle.indexOf(datei);
+  lb.dataset.ordner = i.ordner;
+  lb.querySelector("img").src = bildUrl(i, datei, 1600);
+  lb.hidden = false;
+}
+
+function blaettereBild(schritt) {
+  const lb = document.getElementById("lightbox"); const i = finde(lb.dataset.ordner);
+  if (!i) return;
+  const alle = [...(i.fotos || []), ...(i._alle_fotos || []).filter((f) => !(i.fotos || []).includes(f))];
+  lightboxIndex = (lightboxIndex + schritt + alle.length) % alle.length;
+  lb.querySelector("img").src = bildUrl(i, alle[lightboxIndex], 1600);
+}
+
+document.getElementById("lightbox").addEventListener("click", (e) => (e.currentTarget.hidden = true));
+document.getElementById("neu-laden").addEventListener("click", () => laden().then((ok) => ok && toast("Neu geladen")));
+window.addEventListener("focus", pruefeVersion);
+document.addEventListener("visibilitychange", pruefeVersion);
+new ResizeObserver(() => document.documentElement.style.setProperty("--kopf-h", document.querySelector(".kopf").offsetHeight + "px"))
+  .observe(document.querySelector(".kopf"));
+
+document.addEventListener("keydown", (e) => {
+  const lb = document.getElementById("lightbox");
+  if (!lb.hidden) {
+    if (e.key === "Escape") lb.hidden = true;
+    if (e.key === "ArrowRight") blaettereBild(1);
+    if (e.key === "ArrowLeft") blaettereBild(-1);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    const i = finde(aktuell);
+    const sichtbar = getComputedStyle(document.getElementById("detail")).display !== "none";
+    if (!e.repeat && i && sichtbar && (i.status === "neu" || i.status === "zurueckgestellt")) setzeStatus("freigegeben");
+    return;
+  }
+  if (e.target.closest("input, textarea, select")) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    const s = sichtbare(); const idx = s.findIndex((i) => i.ordner === aktuell);
+    const n = s[idx + (e.key === "ArrowDown" ? 1 : -1)];
+    if (n) { e.preventDefault(); waehle(n.ordner); }
+  }
+});
+
+window.addEventListener("beforeunload", (e) => { if (offen.felder) { speichernJetzt().catch(() => {}); e.preventDefault(); e.returnValue = ""; } });
+
+if (location.protocol === "file:") {
+  document.getElementById("detail").replaceChildren(h("div", { class: "box fehlt" },
+    h("h3", {}, "Bitte nicht als Datei öffnen"),
+    "Diese Seite braucht den kleinen lokalen Server. Starte ihn per Doppelklick auf „Freigabe starten.bat“ im Projektordner ",
+    "(oder: python vinted.py freigabe). Dann öffnet sich die Seite unter http://127.0.0.1:8765 von selbst."));
+} else {
+  laden().then(() => lageAbfragen());
+}
+</script>
+</body>
+</html>

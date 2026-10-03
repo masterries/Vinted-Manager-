@@ -1,0 +1,11 @@
+{
+  "domain": "https://www.vinted.lu",
+  "sprache_inseratstext": "en+de",
+  "profil_ordner": "browser-profil",
+  "schuhe_ordner": "schuhe",
+  "inserate_datei": "inserate.json",
+  "freigabe_port": 8765,
+  "chrome_port": 9222,
+  "pause_zwischen_inseraten_sek": [20, 45],
+  "max_fotos": 20
+}

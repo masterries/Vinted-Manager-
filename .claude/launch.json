@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "freigabe",
+      "runtimeExecutable": ".venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-u", "vinted.py", "freigabe", "--kein-browser"],
+      "port": 8765
+    }
+  ]
+}
