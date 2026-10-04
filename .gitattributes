@@ -1,0 +1,10 @@
+# Line endings: the repository stores text files with LF, and these types are also checked out with LF on Windows
+# (keeps diffs and greps across the split web UI clean). Everything else: Git decides (text=auto).
+* text=auto
+*.py   text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.md   text eol=lf
+*.json text eol=lf

@@ -22,6 +22,20 @@ from . import chrome, core
 from .i18n import tr
 
 WEB = Path(__file__).resolve().parent / "web"
+# The page: "/" -> web/index.html; its files are served at the same relative paths (/css/…, /js/…, /vendor/…),
+# so index.html can use relative links that also work when it is opened as a file (see docs/FRONTEND.md).
+STATIC_DIRS = ("css", "js", "vendor")
+STATIC_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+# Only for the page itself (index.html): it has no inline script, so the browser may run nothing but our own files
+# (an accidental HTML/script injection could not execute), and no other site may frame the hub. Styles: own files plus
+# the style properties Preact sets ('unsafe-inline'); images: own /image/ route and the "data:," favicon.
+PAGE_HEADERS = {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                               "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+                               "frame-ancestors 'none'",
+    "X-Frame-Options": "DENY",
+}
+WINDOWS_DEVICES = {"CON", "PRN", "AUX", "NUL"} | {f"{p}{n}" for p in ("COM", "LPT") for n in range(1, 10)}
 PREVIEW_WIDTHS = (360, 1600)
 _write_lock = threading.Lock()
 _photos_lock = threading.Lock()
@@ -45,6 +59,27 @@ def read(config: dict) -> list[dict]:
 def version(config: dict) -> int:
     path = core.listings_path(config)
     return path.stat().st_mtime_ns if path.exists() else 0
+
+
+def _bad_segment(part: str) -> bool:
+    """URL segment that must never reach the file system: empty, "." / "..", a separator, drive colon or NUL
+    (also when %-encoded), a trailing dot or space (Windows drops them, so "app.js." would alias "app.js"),
+    or a Windows device name such as CON or NUL.js."""
+    return (part in ("", ".", "..") or any(c in part for c in "/\\:\0") or part.endswith((".", " "))
+            or part.split(".")[0].upper() in WINDOWS_DEVICES)
+
+
+def static_path(url_path: str) -> Path:
+    """File for /css/…, /js/…, /vendor/… - only below web/<dir>, only .js/.css (no .md/.txt/.html), else 404.
+    Each segment is decoded on its own, so an encoded "/" or "\\" cannot create new segments."""
+    parts = [unquote(p) for p in url_path.split("/")[1:]]
+    if len(parts) < 2 or parts[0] not in STATIC_DIRS or any(_bad_segment(p) for p in parts):
+        raise ApiError(HTTPStatus.NOT_FOUND, tr("Not found"))
+    root = (WEB / parts[0]).resolve()
+    path = root.joinpath(*parts[1:]).resolve()
+    if root not in path.parents or path.suffix.lower() not in STATIC_TYPES or not path.is_file():
+        raise ApiError(HTTPStatus.NOT_FOUND, tr("Not found"))
+    return path
 
 
 def safe_image_path(config: dict, folder: str, file: str) -> Path:
@@ -432,6 +467,15 @@ class Handler(BaseHTTPRequestHandler):
         except ConnectionError:  # browser aborted (e.g. image no longer needed)
             self.close_connection = True
 
+    def _file(self, path: Path, content_type: str, extra_headers: dict | None = None) -> None:
+        """A page file, read fresh from disk; no-cache + ETag: the browser revalidates, so an update applies on reload."""
+        st = path.stat()
+        etag = f'"{st.st_mtime_ns}-{st.st_size}"'
+        headers = {"Cache-Control": "no-cache", "ETag": etag, "X-Content-Type-Options": "nosniff", **(extra_headers or {})}
+        if self.headers.get("If-None-Match") == etag:
+            return self._respond(HTTPStatus.NOT_MODIFIED, b"", content_type, headers)
+        return self._respond(HTTPStatus.OK, path.read_bytes(), content_type, headers)
+
     def _json(self, status: HTTPStatus, data) -> None:
         self._respond(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
@@ -453,8 +497,10 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         try:
             if url.path in ("/", "/index.html"):
-                html = (WEB / "hub.html").read_bytes()
-                return self._respond(HTTPStatus.OK, html, "text/html; charset=utf-8")
+                return self._file(WEB / "index.html", "text/html; charset=utf-8", PAGE_HEADERS)
+            if (url.path.split("/") + [""])[1] in STATIC_DIRS:
+                path = static_path(url.path)
+                return self._file(path, STATIC_TYPES[path.suffix.lower()])
             if url.path == "/api/data":
                 return self._json(HTTPStatus.OK, all_data(self.config))
             if url.path == "/api/settings":
@@ -534,6 +580,8 @@ class Server(ThreadingHTTPServer):
     # On Windows SO_REUSEADDR would allow a second server on the same port
     allow_reuse_address = False
     daemon_threads = True
+    # The page loads ~60 ES modules at once; the default backlog (5) makes Windows refuse some connections
+    request_queue_size = 128
 
 
 def run(config: dict, open_browser: bool = True) -> None:

@@ -50,7 +50,8 @@ you review and answer open questions with one click → the Vinted upload form i
 ```
 
 - **No bot browser:** a browser launched by Playwright was blocked by Vinted's bot detection. The hub therefore starts a normal Chrome with its own profile. You log in yourself, and the scripts attach to that window over the Chrome DevTools Protocol.
-- **Lightweight on purpose:** the server uses only the Python standard library plus Pillow. The UI is one HTML file with vanilla JavaScript and SVG charts, with no build step and no framework.
+- **Lightweight on purpose:** the server uses only the Python standard library plus Pillow. The UI is a small Preact + htm app (the library is vendored as one file) with plain SVG charts: ES modules loaded as they are, with no npm and no build step.
+- **Hub UI without a build step:** `vinted_hub/web/` holds the page shell (`index.html`), the stylesheets (`css/`) and the app as plain ES modules (`js/`): one state module with all actions (loading, the save queue with conflict detection, polling, settings), shared components, one folder per view (listings, prices, statistics) and English source texts with German dictionaries. [Preact](https://preactjs.com) and [htm](https://github.com/developit/htm) are vendored as a single file (`web/vendor/preact-htm.js`), so there is no npm, no Node.js and no bundler: the server hands the files to the browser as they are, and an edited file is live after a page reload. Structure, rules, how to add texts or views and how to update the library: [`docs/FRONTEND.md`](docs/FRONTEND.md).
 - **Safe with parallel edits:** writes use a file lock, atomic replace with a backup, and per-field conflict detection. Editing in the hub while a job runs does not lose changes.
 
 ## Setup (Windows)
@@ -99,14 +100,19 @@ vinted_hub/                Python package – python -m vinted_hub <command>
   form.py                  fill the Vinted upload form, read the price recommendation
   commands.py              CLI commands (login, fill, fill-approved, prices, stats, explore)
   server.py                local hub server (standard library + Pillow)
-  web/hub.html             hub UI (single file, vanilla JS, SVG charts, English + German texts)
-tools/                     contact_sheet.py · check_listing.py · import_listings.py · explore_dropdowns.py
+  web/                     hub UI – Preact + htm, no build step (see docs/FRONTEND.md)
+    index.html             page shell
+    css/                   styles per area (base, layout, listings, tables, stats, overlays)
+    js/                    ES modules: app.js · state/ · components/ · views/listings|prices|stats/ · i18n.js + i18n/de.*.js
+    vendor/                preact-htm.js (Preact + htm in one file) and its licences
+tools/                     contact_sheet.py · check_listing.py · import_listings.py · explore_dropdowns.py ·
+                           check_i18n.py (translations) · test_server_static.py (static file route of the server)
 .claude/workflows/         vinted-analysis.js – analysis workflow for Claude Code
 config.json                domain, ports, folders, default settings
 Start Hub.bat              start the hub
 Vinted Login.bat           open the Vinted Chrome
 data/                      all personal data (not in git)
-docs/                      GUIDE.en.md / GUIDE.md (user guide, English / German) · images/ (screenshots)
+docs/                      GUIDE.en.md / GUIDE.md (user guide, English / German) · FRONTEND.md (hub UI guide) · images/
 CLAUDE.md / AGENTS.md      instructions for AI coding agents
 ```
 

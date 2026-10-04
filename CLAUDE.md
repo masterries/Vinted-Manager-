@@ -15,8 +15,11 @@ Formular im Vinted-Chrome automatisch ausfüllen → **der Nutzer schickt selbst
   Beschreibungssprache (`[? please confirm]` / `[? bitte bestätigen]`, `[?]` für unbekannte Werte); Fragen-Optionen ersetzen nur
   Text in der Sprache des Textes, den sie ändern. Das Prüfwerkzeug meldet Text in der falschen Sprache bei noch nicht eingestellten Inseraten.
 - Windows 10, Python 3.9 (`.venv\Scripts\python.exe`). Kein `match`, keine `X | Y`-Typen zur Laufzeit.
-- Code: Paket `vinted_hub\` (`core.py`, `i18n.py`, `chrome.py`, `form.py`, `commands.py`, `server.py`, `web\hub.html`),
+- Code: Paket `vinted_hub\` (`core.py`, `i18n.py`, `chrome.py`, `form.py`, `commands.py`, `server.py`, Oberfläche in `web\`),
   Werkzeuge in `tools\`, alle persönlichen Daten in `data\`.
+- Oberfläche der Zentrale: kleine **Preact + htm**-App in `vinted_hub\web\` (`index.html`, `css\`, `js\` als ES-Module,
+  Bibliothek eingebettet in `web\vendor\preact-htm.js` – **kein npm, kein Build-Schritt**). Aufbau, Regeln und Tests:
+  **`docs\FRONTEND.md`** (vor Änderungen an der Oberfläche lesen).
 - Kurzanleitung für den Nutzer: `docs\GUIDE.md` (Deutsch), `docs\GUIDE.en.md` (Englisch).
 
 ## Häufigster Auftrag: „Neue Fotos sind in 0_input_photos, bitte analysieren“
@@ -49,19 +52,53 @@ Formular im Vinted-Chrome automatisch ausfüllen → **der Nutzer schickt selbst
 - Start für den Nutzer: `Start Hub.bat` → http://127.0.0.1:8765. Von Claude: im Hintergrund
   `.venv\Scripts\python.exe -u -m vinted_hub serve --no-browser` (PowerShell, `run_in_background`).
 - Nach Änderungen an `vinted_hub\*.py` den Server **neu starten** (alten Prozess mit `vinted_hub serve` in der
-  Kommandozeile beenden). `vinted_hub\web\hub.html` wird bei jedem Aufruf frisch von der Platte gelesen → nur Seite neu laden.
-  Aber: eine `hub.html` aus einer neueren Version braucht den **passenden Server** – ein noch laufender alter Server liefert
+  Kommandozeile beenden). Die Dateien in `vinted_hub\web\` (`index.html`, `css\`, `js\`) werden bei jedem Aufruf frisch von der
+  Platte gelesen → nur Seite neu laden.
+  Aber: eine Oberfläche aus einer neueren Version braucht den **passenden Server** – ein noch laufender alter Server liefert
   die neue Seite sofort aus, kennt aber ihre neuen API-Pfade nicht (z. B. Einstellungen: „Nicht gefunden“). Nach einem Update
   (neue Dateien kopiert) den Server deshalb sofort neu starten, bevor der Nutzer die Seite neu lädt.
 - Ein zweiter Start auf demselben Port bricht absichtlich ab („läuft schon“).
 - Ansichten: **Inserate** (Liste + Detail, roter Kasten „Fehlt noch“ mit Fragen-Knöpfen), **Preise** (Tabelle),
   **Statistik** (Kennzahl-Kacheln mit Sparkline, Verlaufs-Liniendiagramm und Balken je Inserat, Umschalter Aufrufe/Favoriten,
-  Tabelle mit Sparklines; reines SVG in `vinted_hub\web\hub.html`, Farben `--viz-1` blau = Aufrufe, `--viz-2` orange = Favoriten,
+  Tabelle mit Sparklines; reines SVG in `vinted_hub\web\js\views\stats\`, Farben `--viz-1` blau = Aufrufe, `--viz-2` orange = Favoriten,
   auf Farbsehschwäche geprüft – keine zweite y-Achse, Werte immer auch als Tabelle).
   Kopfzeile: Chrome-Status, „Alle freigegebenen ausfüllen“, „Statistik abrufen“, **Einstellungen** (Dialog für die drei Sprachen,
   siehe „Einstellungen & Sprachen“).
 - Die Seite pollt `/api/status` (5 s) und lädt neu, wenn sich `data\listings.json` ändert; geänderte Einstellungen übernimmt
   sie beim nächsten Poll.
+
+### Oberfläche der Zentrale (Code)
+
+- **Preact + htm, eingebettet als eine Datei:** `vinted_hub\web\vendor\preact-htm.js` (htm 3.1.1 „preact/standalone“, unverändert;
+  Lizenzen in `vendor\LICENSES.md`). **Kein npm, kein Node, kein Build-Schritt:** Der Browser lädt die ES-Module so, wie sie auf
+  der Platte liegen. `server.py` liefert `/` = `web\index.html` sowie `/css/…`, `/js/…`, `/vendor/…` (nur `.js`/`.css`, bei jedem
+  Aufruf frisch von der Platte) → nach einer Änderung an der Oberfläche genügt „Seite neu laden“. Die Seite kommt mit einer
+  Content-Security-Policy (nur eigene Skript-Dateien): **kein Inline-`<script>`, keine `on…=`-Attribute** in `index.html`.
+- Aufbau von `vinted_hub\web\`: `index.html` (Gerüst) · `css\` (Stile je Bereich) · `js\app.js` (Start) · `js\state\` (ein
+  Zustandsobjekt + alle Aktionen: Laden, Speichern mit Warteschlange und 409-Konflikten, Polling, Aufträge, Einstellungen) ·
+  `js\components\` (Kopfzeile, Einstellungen-Dialog, Toast, Lightbox, Eingabefelder …) · `js\views\listings\`, `js\views\prices\`,
+  `js\views\stats\` (die drei Ansichten) · `js\i18n.js` + `js\i18n\de.<bereich>.js` (Texte). Datei-für-Datei-Beschreibung,
+  Regeln und Tests: **`docs\FRONTEND.md`**.
+- Regeln: Komponenten ändern den Zustand nie selbst, sie rufen Aktionen aus `js\state\` auf. Textfelder immer mit
+  `components\inputs.js` (`TextInput`/`TextArea`), damit Tippen, Fokus und Cursor das Polling und den Sprachwechsel überstehen.
+  Listen mit `key`; ebenso Knöpfe, deren Platz je nach Status eine andere Aktion bekommt (sonst bleibt der Fokus auf einem Knopf
+  mit neuer Aktion). **Nie** `innerHTML`/`dangerouslySetInnerHTML` – Daten werden nie zu HTML; Links aus Daten nur über
+  `webUrl()` (`js\util\format.js`, nur http(s)). IDs, Klassen und `data-key`s nicht umbenennen (Tests und CSS hängen daran).
+- **Neuer sichtbarer Text:** im Code `t("English text {name}", { name })` bzw. `tn(n, "{n} item", "{n} items")` (britisches
+  Englisch, Text in doppelten Anführungszeichen), deutscher Eintrag in genau ein passendes `js\i18n\de.<bereich>.js` (gleiche
+  `{Platzhalter}`), dann `.venv\Scripts\python.exe tools\check_i18n.py` – muss OK melden.
+- **Neuer Bereich in einer Ansicht** (z. B. ein Kasten in der Statistik): neue Datei in `js\views\<bereich>\`, eingebunden in die
+  Ansicht (`StatsView.js` …). Braucht er neue Daten vom Server: API-Pfad in `server.py` → Funktion in `js\api.js` → Aktion in
+  `js\state\` → Export in `js\state\index.js`. **Ganz neue Ansicht** zusätzlich: Knopf im Umschalter (`components\Header.js`,
+  `data-key=view-<name>`), Anzeige in `components\App.js`, erlaubter Wert für `vh_view` in `js\state\store.js`, Stile in einer
+  CSS-Datei (neue Datei in `index.html` eintragen), Texte in einem eigenen `de.<name>.js` (in `i18n.js` importieren).
+  Schritt für Schritt: `docs\FRONTEND.md`, Abschnitt 6.
+- **Bibliothek aktualisieren** (ohne npm): `https://registry.npmjs.org/htm/-/htm-<version>.tgz` laden, entpacken,
+  `package\preact\standalone.module.js` nach `web\vendor\preact-htm.js` und `package\LICENSE` nach `web\vendor\LICENSE-htm.txt`
+  kopieren, Version in `vendor\LICENSES.md` nachtragen, alle Tests laufen lassen. Nie von Hand in `preact-htm.js` ändern; nur
+  `js\lib\preact.js` importiert sie.
+- Prüfen nach Änderungen an der Oberfläche: `node --check` für jedes Modul, `tools\check_i18n.py`, `tools\test_server_static.py`
+  und die Browser-Tests an einer Kopie mit eigenem Port (`docs\FRONTEND.md`, Abschnitt 7).
 
 ## Vinted-Chrome und Aufträge
 
@@ -167,8 +204,9 @@ Nur wenn der Nutzer es möchte (z. B. nach einer Änderung der Einstellungen). D
 Code-Bezeichner, Datei-/Ordnernamen, Befehle, API-Pfade, JSON-Schlüssel und gespeicherte Werte sind **Englisch**.
 Die Oberfläche ist **zweisprachig** (`ui_language`): Alle sichtbaren Texte (Zentrale, Fehlermeldungen, Auftrags-Protokolle,
 CLI-Ausgaben) stehen im Code auf **Englisch**; die deutsche Übersetzung steht je Seite in genau einem Wörterbuch –
-Python: `DE` in `vinted_hub\i18n.py` (`tr("Photo missing: {files}", files=...)`), Oberfläche: `const DE` in
-`vinted_hub\web\hub.html` (`t("English text {name}", {name})`). **Jeder neue sichtbare Text braucht beide Fassungen**
+Python: `DE` in `vinted_hub\i18n.py` (`tr("Photo missing: {files}", files=...)`), Oberfläche: die Wörterbücher
+`vinted_hub\web\js\i18n\de.<bereich>.js` (`core`, `listings`, `prices`, `stats`; `t("English text {name}", {name})`, ein Text in
+genau einer Datei). Prüfen: `.venv\Scripts\python.exe tools\check_i18n.py`. **Jeder neue sichtbare Text braucht beide Fassungen**
 (englischer Quelltext + deutscher Eintrag mit denselben `{Platzhaltern}`). Deutsche Formulierungen, die der Nutzer kennt,
 bleiben; Englisch kurz, schlicht und in **britischer** Schreibweise (favourites, colour, analyse, recognised).
 Produktname: de „Vinted Zentrale“, en „Vinted Hub“.
@@ -240,6 +278,8 @@ Wichtige Schlüssel (Bedeutung → JSON):
 ## Stolpersteine
 
 - Bash-Heredocs mit Apostrophen (`Levi's`, `Women's`) brechen ab → Python-Skript als Datei schreiben und ausführen.
+- Windows-Pfade in normalen Python-Strings: `\v`, `\t`, `\n` … werden zu Steuerzeichen (aus `web\vendor` wurde so schon einmal
+  `web` + unsichtbares Zeichen + `endor`) → Rohstrings (`r"…"`) oder `/` verwenden, besonders beim Schreiben von Doku per Skript.
 - PowerShell 5.1 `Set-Content -Encoding UTF8` schreibt ein BOM – Lesecode nutzt `utf-8-sig`.
 - `os.replace` scheitert unter Windows, wenn die Zieldatei offen ist → `write_listings` wiederholt automatisch.
 - Fotos öffnen immer über `vinted_hub.core.open_image(path)` (HEIC + EXIF-Drehung); Upload-Fotos ohne Metadaten (GPS) über

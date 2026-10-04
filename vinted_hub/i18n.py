@@ -4,7 +4,7 @@ Source texts in the code are English and go through tr():
     tr("Photo missing: {files}", files="a.jpg")
 The German translation of each text lives in DE below (same {placeholders}).
 Texts stored in the listings (questions, hints, title, description ...) are never translated.
-Check that every tr() text has a German entry: scratchpad script check_i18n_py.py.
+Check that every tr() text has a German entry (and the web page's texts): python tools/check_i18n.py
 """
 from __future__ import annotations
 
